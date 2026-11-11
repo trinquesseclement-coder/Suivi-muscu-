@@ -206,7 +206,12 @@ export const store = {
 
   importData(json: string) {
     const data = JSON.parse(json) as Partial<Cache>
-    for (const s of Object.values(data.sessions ?? {})) {
+    for (const raw of Object.values(data.sessions ?? {})) {
+      // En ligne, une séance venue du mode local (fichier exporté) devient la mienne
+      const s =
+        sb && meId && isLocalId(raw.ownerId)
+          ? { ...raw, ownerId: meId, createdBy: isLocalId(raw.createdBy) ? meId : raw.createdBy }
+          : raw
       cache.sessions[s.id] = s
       enqueue('sessions', s.id)
     }
@@ -471,13 +476,92 @@ function stopRealtime() {
 
 let initializedFor: string | null = null
 
+const K_BACKUP = 'suivi:backup'
+export const K_PARTNER_EXPORT = 'suivi:partner-export'
+const isLocalId = (id: string | null | undefined) => !!id && id.startsWith('local-')
+
+/** Copie de sécurité avant d'effacer le cache (récupérable à la main si besoin). */
+function backupCache() {
+  try {
+    if (Object.keys(cache.sessions).length) {
+      localStorage.setItem(K_BACKUP, JSON.stringify({ savedAt: new Date().toISOString(), meId, ...cache }))
+    }
+  } catch {
+    /* stockage plein */
+  }
+}
+
+interface LocalData {
+  me: string
+  cache: Cache
+}
+
+function takeLocalData(): LocalData | null {
+  const hasLocal = Object.values(cache.sessions).some((s) => isLocalId(s.ownerId))
+  if (!hasLocal) return null
+  return { me: isLocalId(meId) ? meId! : 'local-clement', cache: JSON.parse(JSON.stringify(cache)) as Cache }
+}
+
+/**
+ * Premier passage en ligne : les séances faites en mode local deviennent celles du
+ * compte connecté. Celles de l'autre profil local sont mises de côté pour être
+ * exportées vers son téléphone (Réglages).
+ */
+function migrateLocal(local: LocalData, userId: string) {
+  const mine: Session[] = []
+  const partner: Record<string, Session> = {}
+  for (const s of Object.values(local.cache.sessions)) {
+    if (!isLocalId(s.ownerId)) continue
+    if (s.ownerId === local.me) {
+      mine.push({ ...s, ownerId: userId, createdBy: isLocalId(s.createdBy) ? userId : s.createdBy })
+    } else {
+      partner[s.id] = s
+    }
+  }
+  for (const s of mine) {
+    if (!cache.sessions[s.id]) {
+      cache.sessions[s.id] = s
+      enqueue('sessions', s.id)
+    }
+  }
+  for (const e of Object.values(local.cache.exercises)) {
+    if (!cache.exercises[e.id]) {
+      cache.exercises[e.id] = e
+      enqueue('exercises', e.id)
+    }
+  }
+  const lp = local.cache.profiles[local.me]
+  if (lp && !cache.profiles[userId]) {
+    const taken = new Set(Object.values(cache.profiles).map((p) => p.slot))
+    cache.profiles[userId] = {
+      id: userId,
+      name: lp.name,
+      slot: taken.has(1) ? 2 : 1,
+      avatar: lp.avatar,
+      needsHelp: lp.needsHelp ?? lp.slot === 1,
+    }
+    enqueue('profiles', userId)
+  }
+  if (Object.keys(partner).length) {
+    try {
+      localStorage.setItem(K_PARTNER_EXPORT, JSON.stringify({ version: 1, sessions: partner }))
+    } catch {
+      /* stockage plein : elles restent dans la sauvegarde */
+    }
+  }
+  persist()
+}
+
 async function onAuth(session: AuthSession | null) {
   auth = { ready: true, session }
   if (session) {
     const userId = session.user.id
     if (initializedFor === userId) return emit()
+    // Données du mode local (avant Supabase) : on les met de côté pour les reprendre.
+    const local = takeLocalData()
     if (meId && meId !== userId) {
-      // Un autre compte s'était connecté sur ce téléphone : on repart à zéro.
+      // Un autre compte (ou le mode local) était sur ce téléphone : sauvegarde, puis on repart à zéro.
+      backupCache()
       cache = { profiles: {}, sessions: {}, exercises: {} }
       outbox = { sessions: [], exercises: [], profiles: [] }
       localStorage.removeItem(K_CURSOR)
@@ -489,6 +573,7 @@ async function onAuth(session: AuthSession | null) {
     persist()
     emit()
     await pull(true)
+    if (local) migrateLocal(local, userId)
     loaded = true
     emit()
     await flush()

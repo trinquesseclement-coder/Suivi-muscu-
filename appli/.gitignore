@@ -5,3 +5,4 @@ dev-dist
 .env.local
 .netlify
 *.tsbuildinfo
+tests/.tmp

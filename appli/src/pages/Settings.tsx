@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { store, useStore } from '../lib/store'
+import { K_PARTNER_EXPORT, store, useStore } from '../lib/store'
 import { back } from '../lib/router'
 import { getSupabaseConfig, setManualSupabaseConfig } from '../lib/supabase'
 import { isoDate } from '../lib/util'
@@ -208,6 +208,8 @@ export function Settings() {
         ) : null}
       </section>
 
+      <PartnerExport />
+
       <section className="card stack">
         <h2>Sauvegarde</h2>
         <p className="small muted">Un fichier avec toutes vos séances, à garder au cas où.</p>
@@ -301,5 +303,53 @@ function ProfileEditor({ profile }: { profile: Profile }) {
         }}
       />
     </div>
+  )
+}
+
+/** Séances de l'autre restées sur ce téléphone après le passage du mode local au mode en ligne. */
+function PartnerExport() {
+  const { profiles, meId } = useStore()
+  const [raw, setRaw] = useState(() => localStorage.getItem(K_PARTNER_EXPORT))
+  if (!raw) return null
+  let count = 0
+  try {
+    count = Object.keys((JSON.parse(raw) as { sessions: object }).sessions).length
+  } catch {
+    return null
+  }
+  const other = profiles.find((p) => p.id !== meId)?.name ?? 'ton binôme'
+  return (
+    <section className="card stack">
+      <h2>Séances de {other} sur ce téléphone</h2>
+      <p className="small muted">
+        {count} séance{count > 1 ? 's' : ''} de {other} {count > 1 ? 'ont été notées' : 'a été notée'} ici en mode local. Envoie-lui ce
+        fichier : sur son téléphone, Réglages → Sauvegarde → Importer, et elles deviennent les siennes.
+      </p>
+      <div className="row wrap">
+        <button
+          className="btn primary"
+          onClick={() => {
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' }))
+            a.download = `seances-pour-${other.toLowerCase()}.json`
+            a.click()
+            URL.revokeObjectURL(a.href)
+          }}
+        >
+          Exporter pour {other}
+        </button>
+        <button
+          className="btn danger"
+          onClick={() => {
+            if (confirm(`Effacer ces ${count} séances de ce téléphone ? Fais l’export d’abord.`)) {
+              localStorage.removeItem(K_PARTNER_EXPORT)
+              setRaw(null)
+            }
+          }}
+        >
+          Effacer
+        </button>
+      </div>
+    </section>
   )
 }
