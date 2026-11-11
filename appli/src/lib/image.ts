@@ -13,7 +13,10 @@ export async function toAvatar(file: File, size = 256): Promise<string> {
     canvas.width = size
     canvas.height = size
     const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size)
+    // Sur un portrait, le visage est dans le haut : on recadre un peu au-dessus du centre.
+    const sx = (img.naturalWidth - side) / 2
+    const sy = (img.naturalHeight - side) * (img.naturalHeight > img.naturalWidth ? 0.4 : 0.5)
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
     return canvas.toDataURL('image/jpeg', 0.8)
   } finally {
     URL.revokeObjectURL(url)
