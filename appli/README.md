@@ -11,6 +11,8 @@ Appli de suivi de séances à deux (Clément & Jules), installable sur le télé
   - *Fauteuil* (faisable sans quitter le fauteuil), *Transfert* (s'installer sur le siège) ou *Debout* ;
   - *Aide Jules* quand il faut charger des disques ou installer.
 
+  Chaque machine a une vignette : **la photo de ta machine** si tu l'as prise (partagée avec ton binôme), sinon une **illustration du mouvement** (départ / arrivée). Touche la vignette en séance pour la voir en grand.
+
   On filtre là-dessus, et tout se corrige (posture, aide, réglages du siège en note) : la correction est partagée entre vous deux.
 
 ## Lancer en local
@@ -73,3 +75,7 @@ appli/
 ```
 
 Stack : React 19 + TypeScript + Vite, PWA (vite-plugin-pwa), Supabase. Thème « sauge » en verre dépoli, police Poppins (embarquée, marche hors ligne).
+
+## Illustrations : à savoir
+
+Les illustrations des mouvements viennent de [free-exercise-db](https://github.com/yuhonas/free-exercise-db). Le projet se déclare domaine public, mais ses photos sont visiblement d'origine **Bodybuilding.com** (leur logo est sur les t-shirts). Elles ne sont donc **pas copiées dans ce dépôt** : l'appli les affiche depuis GitHub, et le téléphone les garde en cache pour la salle. C'est acceptable pour un usage privé à deux. Si l'appli devenait publique, il faudrait les retirer (`src/data/illustrations.ts`) au profit de vos propres photos de machines.

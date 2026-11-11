@@ -4,6 +4,7 @@ import { useStore } from '../lib/store'
 import { ExerciseBadges, Sheet } from './ui'
 import { applyFilters, ExerciseFilters, useFilters } from './ExerciseFilters'
 import { IconCheck } from './Icons'
+import { ExerciseThumb } from './ExerciseMedia'
 
 export function ExercisePicker({
   onClose,
@@ -40,6 +41,7 @@ export function ExercisePicker({
                 <span className={`tick${on ? ' on' : ''}`}>
                   <IconCheck />
                 </span>
+                <ExerciseThumb ex={ex} size={48} />
                 <span className="grow">
                   <span className="title">{ex.name}</span>
                   <span className="meta">

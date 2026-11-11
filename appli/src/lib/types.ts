@@ -34,6 +34,8 @@ export interface Exercise {
   /** Pas de charge par défaut pour les +/- (kg). */
   step?: number
   note?: string
+  /** Photo de la machine dans votre salle (data URL JPEG compressée). */
+  photo?: string
   custom?: boolean
   deleted?: boolean
 }

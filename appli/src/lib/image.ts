@@ -22,3 +22,24 @@ export async function toAvatar(file: File, size = 256): Promise<string> {
     URL.revokeObjectURL(url)
   }
 }
+
+/** Photo de machine : on garde le cadrage, côté max 640 px (~40 Ko). */
+export async function toPhoto(file: File, maxSide = 640): Promise<string> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = () => reject(new Error('Image illisible'))
+      i.src = url
+    })
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.75)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}

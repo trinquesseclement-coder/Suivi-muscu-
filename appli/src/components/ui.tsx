@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { Exercise, Profile } from '../lib/types'
 import { POSTURE_SHORT } from '../data/exercises'
 import { IconClose, IconHands, IconWheelchair } from './Icons'
@@ -104,7 +105,8 @@ export function Sheet({
       document.body.style.overflow = prev
     }
   }, [onClose])
-  return (
+  // Rendu au niveau de <body> : une carte en verre (backdrop-filter) piégerait la fenêtre à l'intérieur.
+  return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
@@ -116,7 +118,8 @@ export function Sheet({
         <div className="sheet-body">{children}</div>
         {footer ? <div className="sheet-foot">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

@@ -8,6 +8,7 @@ import { fmtDay, fmtDM, fmtNum, fmtTonnage, isoDate, uid } from '../lib/util'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseBadges, Person, Sheet, Stepper } from '../components/ui'
 import { restAlert, unlockAudio, useWakeLock } from '../lib/device'
+import { ExerciseThumb, MovementSheet } from '../components/ExerciseMedia'
 import { IconBack, IconCheck, IconClose, IconCopy, IconMore, IconPlus, IconTimer, IconTrophy } from '../components/Icons'
 
 const K_REST = 'suivi:rest'
@@ -259,6 +260,7 @@ function ExerciseBlock({
 }) {
   const last = lastPerformance(sessions, session.ownerId, ex.id, session.id)
   const step = ex.step ?? 2.5
+  const [media, setMedia] = useState(false)
 
   const setSet = (i: number, patch: Partial<SetEntry>, started = false) =>
     onChange((x) => ({ ...x, sets: x.sets.map((st, j) => (j === i ? { ...st, ...patch } : st)) }), started)
@@ -281,6 +283,7 @@ function ExerciseBlock({
   return (
     <div className={`ex-card${ex.help && showHelp ? ' help' : ''}`}>
       <div className="ex-head">
+        <ExerciseThumb ex={ex} onClick={() => setMedia(true)} />
         <div className="grow">
           <h3>{ex.name}</h3>
           <div className="meta">
@@ -298,6 +301,7 @@ function ExerciseBlock({
           <strong>Réglage :</strong> {ex.note}
         </p>
       ) : null}
+      {media ? <MovementSheet ex={ex} onClose={() => setMedia(false)} /> : null}
       {lastText ? (
         <p className="ex-last">
           Dernière fois ({fmtDM(last!.session.date)}) : <span className="tnum">{lastText}</span>

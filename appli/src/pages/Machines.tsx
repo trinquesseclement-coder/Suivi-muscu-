@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { store, useStore } from '../lib/store'
 import { BASE_EXERCISES, BRAND_LABEL, EQUIPMENT_LABEL, machineLabel, MUSCLE_LABEL, POSTURE_LABEL } from '../data/exercises'
 import { GYM } from '../data/gym'
+import { ExerciseThumb, MovementSheet } from '../components/ExerciseMedia'
 import type { Brand, Equipment, Exercise, Muscle, Posture } from '../lib/types'
 import { helperName } from '../lib/sessions'
 import { uid } from '../lib/util'
@@ -13,6 +14,7 @@ export function Machines() {
   const { exercises, profiles } = useStore()
   const [filters, setFilters] = useFilters('suivi:filters:machines')
   const [editing, setEditing] = useState<Exercise | null>(null)
+  const [viewing, setViewing] = useState<Exercise | null>(null)
   const helper = helperName(profiles)
   const list = applyFilters(exercises, filters)
   const muscu = list.filter((e) => e.kind === 'muscu')
@@ -62,7 +64,9 @@ export function Machines() {
             </div>
             <div className="list">
               {g.items.map((ex) => (
-                <button key={ex.id} className="list-item" onClick={() => setEditing(ex)}>
+                <div key={ex.id} className="list-row">
+                  <ExerciseThumb ex={ex} size={52} onClick={() => setViewing(ex)} />
+                <button className="list-item" onClick={() => setEditing(ex)}>
                   <span className="grow">
                     <span className="title">{ex.name}</span>
                     <span className="meta">
@@ -80,6 +84,7 @@ export function Machines() {
                   </span>
                   <IconChevron width={18} height={18} className="faint" />
                 </button>
+                </div>
               ))}
             </div>
           </section>
@@ -88,6 +93,7 @@ export function Machines() {
       {!list.length ? <p className="empty card">Aucune machine avec ces filtres.</p> : null}
 
       {editing ? <ExerciseEditor ex={editing} helperName={helper} onClose={() => setEditing(null)} /> : null}
+      {viewing ? <MovementSheet ex={exercises.find((e) => e.id === viewing.id) ?? viewing} onClose={() => setViewing(null)} /> : null}
     </div>
   )
 }

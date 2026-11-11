@@ -1209,3 +1209,85 @@ textarea.input,
 .stepper input {
   font-size: 16px;
 }
+
+/* Vignettes : photo de la machine ou illustration du mouvement */
+.thumb {
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  object-fit: cover;
+  flex: none;
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-border);
+}
+.thumb-empty {
+  color: var(--text-3);
+}
+.thumb-empty svg {
+  width: 22px;
+  height: 22px;
+}
+.thumb-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 14px;
+  flex: none;
+  min-width: 48px;
+  min-height: 48px;
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 12px;
+  border-top: 1px solid var(--grid);
+}
+.list-row:first-child {
+  border-top: none;
+}
+.list-row .list-item {
+  border-top: none;
+  padding-left: 8px;
+}
+.machine-photo {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 18px;
+}
+.movement-stage {
+  position: relative;
+  aspect-ratio: 850 / 567;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+}
+.movement-stage .movement {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.35s ease;
+}
+.row > .movement {
+  width: 50%;
+  border-radius: 14px;
+}
+.movement-label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* La zone défilante d'une fenêtre doit pouvoir rétrécir, sinon l'en-tête sort de l'écran */
+.sheet-body {
+  min-height: 0;
+}
