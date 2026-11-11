@@ -276,6 +276,7 @@ interface ProfileRow {
   id: string
   name: string
   slot: 1 | 2
+  avatar: string | null
   updated_at: string
 }
 
@@ -339,7 +340,7 @@ async function flush() {
     let rejected = 0
     rejected += await pushTable('profiles', (id) => {
       const p = cache.profiles[id]
-      return p && { id: p.id, name: p.name, slot: p.slot }
+      return p && { id: p.id, name: p.name, slot: p.slot, avatar: p.avatar ?? null }
     })
     rejected += await pushTable('exercises', (id) => {
       const e = cache.exercises[id]
@@ -425,7 +426,7 @@ async function pull(full = false) {
     if (e.error) throw e.error
 
     for (const r of p.data as ProfileRow[]) {
-      if (!outbox.profiles.includes(r.id)) cache.profiles[r.id] = { id: r.id, name: r.name, slot: r.slot }
+      if (!outbox.profiles.includes(r.id)) cache.profiles[r.id] = { id: r.id, name: r.name, slot: r.slot, avatar: r.avatar ?? undefined }
     }
     for (const r of s.data as SessionRow[]) {
       if (r.updated_at > maxTs) maxTs = r.updated_at

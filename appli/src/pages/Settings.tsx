@@ -4,7 +4,9 @@ import { back } from '../lib/router'
 import { getSupabaseConfig, setManualSupabaseConfig } from '../lib/supabase'
 import { isoDate } from '../lib/util'
 import { getRest, setRest } from './SessionPage'
-import { personColor, Seg, Stepper } from '../components/ui'
+import { Avatar, Seg, Stepper } from '../components/ui'
+import type { Profile } from '../lib/types'
+import { toAvatar } from '../lib/image'
 import { IconBack } from '../components/Icons'
 
 const K_THEME = 'suivi:theme'
@@ -56,19 +58,11 @@ export function Settings() {
               />
             </div>
             {st.profiles.map((p) => (
-              <label className="field" key={p.id}>
-                <span className="row">
-                  <span className="dot" style={{ background: personColor(p) }} /> Prénom
-                </span>
-                <input className="input" defaultValue={p.name} onBlur={(e) => e.target.value.trim() && store.saveProfile({ ...p, name: e.target.value.trim() })} />
-              </label>
+              <ProfileEditor key={p.id} profile={p} />
             ))}
           </>
         ) : me ? (
-          <label className="field">
-            <span>Ton prénom</span>
-            <input className="input" defaultValue={me.name} onBlur={(e) => e.target.value.trim() && store.saveProfile({ ...me, name: e.target.value.trim() })} />
-          </label>
+          <ProfileEditor profile={me} />
         ) : null}
       </section>
 
@@ -209,6 +203,60 @@ export function Settings() {
           />
         </div>
       </section>
+    </div>
+  )
+}
+
+function ProfileEditor({ profile }: { profile: Profile }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="row" style={{ gap: 14, alignItems: 'center' }}>
+      <button
+        className="avatar"
+        style={{ padding: 0, border: 'none', background: 'none', width: 64, height: 64 }}
+        aria-label={`Changer la photo de ${profile.name}`}
+        onClick={() => fileRef.current?.click()}
+      >
+        <Avatar profile={profile} size={60} />
+      </button>
+      <div className="grow stack" style={{ gap: 6 }}>
+        <input
+          className="input"
+          aria-label={`Prénom de ${profile.name}`}
+          defaultValue={profile.name}
+          onBlur={(e) => e.target.value.trim() && store.saveProfile({ ...profile, name: e.target.value.trim() })}
+        />
+        <div className="row" style={{ gap: 4 }}>
+          <button className="link" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? 'Envoi…' : profile.avatar ? 'Changer la photo' : 'Ajouter une photo'}
+          </button>
+          {profile.avatar ? (
+            <button className="link" style={{ marginLeft: 12 }} onClick={() => store.saveProfile({ ...profile, avatar: undefined })}>
+              Retirer
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (!f) return
+          setBusy(true)
+          try {
+            store.saveProfile({ ...profile, avatar: await toAvatar(f) })
+          } catch {
+            alert('Impossible de lire cette image.')
+          } finally {
+            setBusy(false)
+          }
+        }}
+      />
     </div>
   )
 }

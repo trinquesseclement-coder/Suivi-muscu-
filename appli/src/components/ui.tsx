@@ -7,10 +7,28 @@ export function personColor(p?: Profile | null) {
   return p?.slot === 2 ? 'var(--p2)' : 'var(--p1)'
 }
 
+/** Photo ronde cerclée de la couleur de la personne, ou son initiale. */
+export function Avatar({ profile, size = 24 }: { profile?: Profile | null; size?: number }) {
+  const style = {
+    width: size,
+    height: size,
+    fontSize: Math.round(size * 0.42),
+    background: personColor(profile),
+    boxShadow: `0 0 0 2px ${personColor(profile)}`,
+  }
+  return profile?.avatar ? (
+    <img className="avatar-img" src={profile.avatar} alt="" style={style} />
+  ) : (
+    <span className="avatar-img" aria-hidden="true" style={style}>
+      {(profile?.name ?? '?').charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
 export function Person({ profile, you }: { profile?: Profile | null; you?: boolean }) {
   return (
     <span className="person">
-      <span className="dot" style={{ background: personColor(profile) }} />
+      <Avatar profile={profile} size={22} />
       {profile?.name ?? '?'}
       {you ? <span className="faint">(toi)</span> : null}
     </span>

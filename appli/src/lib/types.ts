@@ -37,8 +37,10 @@ export interface Exercise {
 export interface Profile {
   id: string
   name: string
-  /** 1 = bleu, 2 = orange : sert aux graphiques et aux pastilles. */
+  /** 1 = vert, 2 = orange : sert aux graphiques et aux pastilles. */
   slot: 1 | 2
+  /** Photo de profil, carrée et compressée (data URL JPEG ~20 Ko). */
+  avatar?: string
 }
 
 export interface SetEntry {

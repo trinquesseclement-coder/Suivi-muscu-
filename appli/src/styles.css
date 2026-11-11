@@ -1173,3 +1173,20 @@ textarea.input {
 details summary {
   color: var(--text-2);
 }
+
+.avatar-img {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: none;
+  color: #fff;
+  font-weight: 600;
+  border: 2px solid var(--glass-strong);
+}
+/* Dans une feuille modale, l'état « actif » doit rester visible */
+.sheet .chip[aria-pressed='true'] {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--dark-ink);
+}

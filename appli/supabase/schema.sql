@@ -8,6 +8,8 @@ create table if not exists public.profiles (
   slot smallint not null default 1 check (slot in (1, 2)),
   updated_at timestamptz not null default now()
 );
+-- Photo de profil (petite image compressée par l'appli, ~20 Ko)
+alter table public.profiles add column if not exists avatar text check (avatar is null or char_length(avatar) < 300000);
 
 -- ---------- Séances (prévues et faites) ----------
 create table if not exists public.sessions (

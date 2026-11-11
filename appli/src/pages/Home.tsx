@@ -5,7 +5,7 @@ import { weeklyStats, sessionPRs } from '../lib/stats'
 import { blankSession, isLive } from '../lib/sessions'
 import { addDays, fmtDay, fmtTonnage, isoDate } from '../lib/util'
 import { SessionCard } from '../components/SessionCard'
-import { Person, personColor } from '../components/ui'
+import { Avatar, Person } from '../components/ui'
 import { SyncPill } from '../components/SyncPill'
 import { IconDumbbell, IconPlay, IconPlus, IconTimer, IconTrophy } from '../components/Icons'
 
@@ -50,11 +50,11 @@ export function Home() {
         <div className="stack" style={{ gap: 8, alignItems: 'flex-end', alignSelf: 'flex-start' }}>
           <button
             className="avatar"
-            style={{ background: personColor(me) }}
-            aria-label="Réglages"
+            style={{ padding: 0, border: 'none', background: 'none' }}
+            aria-label="Réglages et profil"
             onClick={() => navigate({ name: 'settings' })}
           >
-            {(me?.name ?? '?').charAt(0).toUpperCase()}
+            <Avatar profile={me} size={48} />
           </button>
           <SyncPill />
         </div>
