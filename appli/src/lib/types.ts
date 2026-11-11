@@ -41,6 +41,8 @@ export interface Profile {
   slot: 1 | 2
   /** Photo de profil, carrée et compressée (data URL JPEG ~20 Ko). */
   avatar?: string
+  /** A besoin qu'on l'aide à charger les disques (affiche « Aide <l'autre> »). */
+  needsHelp?: boolean
 }
 
 export interface SetEntry {

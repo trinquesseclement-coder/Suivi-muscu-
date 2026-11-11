@@ -10,6 +10,8 @@ create table if not exists public.profiles (
 );
 -- Photo de profil (petite image compressée par l'appli, ~20 Ko)
 alter table public.profiles add column if not exists avatar text check (avatar is null or char_length(avatar) < 300000);
+-- Qui a besoin d'aide pour charger les disques (null = pas encore réglé)
+alter table public.profiles add column if not exists needs_help boolean;
 
 -- ---------- Séances (prévues et faites) ----------
 create table if not exists public.sessions (

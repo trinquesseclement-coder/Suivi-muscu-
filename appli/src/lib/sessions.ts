@@ -57,6 +57,25 @@ export function partnerOf(profiles: Profile[], id: string | null): Profile | und
   return profiles.find((p) => p.id !== id)
 }
 
+/**
+ * Qui a besoin d'aide pour les disques ? Réglage de chaque profil ; tant qu'il
+ * n'est pas réglé : oui pour le profil n°1 (celui qui a créé l'appli), non sinon.
+ */
+export function profileNeedsHelp(p: Profile): boolean {
+  return p.needsHelp ?? p.slot === 1
+}
+
+export function needsHelp(profiles: Profile[], id: string | null | undefined): boolean {
+  const p = profiles.find((x) => x.id === id)
+  return p ? profileNeedsHelp(p) : false
+}
+
+/** Le nom de l'aidant, identique sur les deux téléphones (« Aide Jules »). */
+export function helperName(profiles: Profile[]): string | undefined {
+  const helped = profiles.find((p) => needsHelp(profiles, p.id))
+  return helped ? partnerOf(profiles, helped.id)?.name : undefined
+}
+
 export function titleSuggestion(items: SessionItem[], byId: Record<string, Exercise>): string {
   const groups = new Set(items.map((i) => byId[i.exerciseId]?.muscle).filter(Boolean))
   const has = (...m: string[]) => m.some((x) => groups.has(x as never))

@@ -31,8 +31,26 @@ export function applyFilters(list: Exercise[], f: Filters) {
   })
 }
 
-export function useFilters(initial: Partial<Filters> = {}) {
-  return useState<Filters>({ ...DEFAULT_FILTERS, ...initial })
+/** Filtres mémorisés sur le téléphone (sauf la recherche) : le filtre « fauteuil » reste actif. */
+export function useFilters(storageKey: string) {
+  const [filters, setFilters] = useState<Filters>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as Partial<Filters>
+      return { ...DEFAULT_FILTERS, ...saved, q: '' }
+    } catch {
+      return DEFAULT_FILTERS
+    }
+  })
+  const update = (f: Filters) => {
+    setFilters(f)
+    try {
+      const { q: _q, ...rest } = f
+      localStorage.setItem(storageKey, JSON.stringify(rest))
+    } catch {
+      /* stockage indisponible : filtres non mémorisés */
+    }
+  }
+  return [filters, update] as const
 }
 
 export function ExerciseFilters({

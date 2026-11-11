@@ -12,17 +12,20 @@ export function SessionCard({
   meId,
   byId,
   prs = [],
+  helped = false,
 }: {
   s: Session
   owner?: Profile
   meId: string | null
   byId: Record<string, Exercise>
   prs?: string[]
+  /** La personne a besoin d'aide : on affiche le nombre d'exercices avec aide. */
+  helped?: boolean
 }) {
   const ton = sessionTonnage(s)
   const cardio = sessionCardioMin(s, byId)
   const sets = sessionSetCount(s)
-  const helpCount = s.items.filter((i) => byId[i.exerciseId]?.help).length
+  const helpCount = helped ? s.items.filter((i) => byId[i.exerciseId]?.help).length : 0
   const names = s.items
     .map((i) => byId[i.exerciseId]?.name)
     .filter(Boolean)

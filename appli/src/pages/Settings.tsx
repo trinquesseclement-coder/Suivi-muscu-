@@ -4,9 +4,11 @@ import { back } from '../lib/router'
 import { getSupabaseConfig, setManualSupabaseConfig } from '../lib/supabase'
 import { isoDate } from '../lib/util'
 import { getRest, setRest } from './SessionPage'
+import { beep, isSoundOn, setSoundOn, unlockAudio } from '../lib/device'
 import { Avatar, Seg, Stepper } from '../components/ui'
 import type { Profile } from '../lib/types'
 import { toAvatar } from '../lib/image'
+import { profileNeedsHelp } from '../lib/sessions'
 import { IconBack } from '../components/Icons'
 
 const K_THEME = 'suivi:theme'
@@ -21,6 +23,7 @@ export function Settings() {
   const me = st.profiles.find((p) => p.id === st.meId)
   const [theme, setTheme] = useState<Theme>(((localStorage.getItem(K_THEME) as Theme) || 'auto'))
   const [rest, setRestState] = useState(getRest())
+  const [sound, setSound] = useState(isSoundOn())
   const cfg = getSupabaseConfig()
   const [url, setUrl] = useState(cfg?.url ?? '')
   const [key, setKey] = useState(cfg?.source === 'manual' ? cfg.key : '')
@@ -81,6 +84,22 @@ export function Settings() {
               setRest(v)
             }}
           />
+        </label>
+        <label className="row" style={{ gap: 10, cursor: 'pointer', minHeight: 44 }}>
+          <input
+            type="checkbox"
+            checked={sound}
+            onChange={(e) => {
+              setSound(e.target.checked)
+              setSoundOn(e.target.checked)
+              if (e.target.checked) {
+                unlockAudio()
+                beep()
+              }
+            }}
+            style={{ width: 22, height: 22, accentColor: 'var(--dark)' }}
+          />
+          Bip à la fin du repos
         </label>
         <div className="field">
           <span>Thème</span>
@@ -227,6 +246,15 @@ function ProfileEditor({ profile }: { profile: Profile }) {
           defaultValue={profile.name}
           onBlur={(e) => e.target.value.trim() && store.saveProfile({ ...profile, name: e.target.value.trim() })}
         />
+        <label className="row small" style={{ gap: 8, cursor: 'pointer', minHeight: 36 }}>
+          <input
+            type="checkbox"
+            checked={profileNeedsHelp(profile)}
+            onChange={(e) => store.saveProfile({ ...profile, needsHelp: e.target.checked })}
+            style={{ width: 22, height: 22, accentColor: 'var(--dark)' }}
+          />
+          A besoin d’aide pour charger les disques
+        </label>
         <div className="row" style={{ gap: 4 }}>
           <button className="link" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? 'Envoi…' : profile.avatar ? 'Changer la photo' : 'Ajouter une photo'}

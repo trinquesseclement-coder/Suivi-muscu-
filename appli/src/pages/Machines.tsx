@@ -2,17 +2,17 @@ import { useState } from 'react'
 import { store, useStore } from '../lib/store'
 import { BASE_EXERCISES, EQUIPMENT_LABEL, MUSCLE_LABEL, POSTURE_LABEL } from '../data/exercises'
 import type { Equipment, Exercise, Muscle, Posture } from '../lib/types'
-import { partnerOf } from '../lib/sessions'
+import { helperName } from '../lib/sessions'
 import { uid } from '../lib/util'
 import { applyFilters, ExerciseFilters, useFilters } from '../components/ExerciseFilters'
 import { ExerciseBadges, Seg, Sheet, Stepper } from '../components/ui'
 import { IconChevron, IconPlus } from '../components/Icons'
 
 export function Machines() {
-  const { exercises, profiles, meId } = useStore()
-  const [filters, setFilters] = useFilters()
+  const { exercises, profiles } = useStore()
+  const [filters, setFilters] = useFilters('suivi:filters:machines')
   const [editing, setEditing] = useState<Exercise | null>(null)
-  const partner = partnerOf(profiles, meId)
+  const helper = helperName(profiles)
   const list = applyFilters(exercises, filters)
   const muscu = list.filter((e) => e.kind === 'muscu')
   const cardio = list.filter((e) => e.kind === 'cardio')
@@ -45,7 +45,7 @@ export function Machines() {
         </button>
       </header>
 
-      <ExerciseFilters value={filters} onChange={setFilters} helperName={partner?.name} />
+      <ExerciseFilters value={filters} onChange={setFilters} helperName={helper} />
 
       {[
         { title: 'Musculation', items: muscu },
@@ -64,7 +64,7 @@ export function Machines() {
                     <span className="title">{ex.name}</span>
                     <span className="meta">
                       {ex.kind === 'muscu' ? <span className="badge">{MUSCLE_LABEL[ex.muscle]}</span> : null}
-                      <ExerciseBadges ex={ex} helperName={partner?.name} />
+                      <ExerciseBadges ex={ex} helperName={helper} />
                     </span>
                     {ex.note ? (
                       <span className="small muted" style={{ display: 'block', marginTop: 4 }}>
@@ -81,7 +81,7 @@ export function Machines() {
       )}
       {!list.length ? <p className="empty card">Aucune machine avec ces filtres.</p> : null}
 
-      {editing ? <ExerciseEditor ex={editing} helperName={partner?.name} onClose={() => setEditing(null)} /> : null}
+      {editing ? <ExerciseEditor ex={editing} helperName={helper} onClose={() => setEditing(null)} /> : null}
     </div>
   )
 }

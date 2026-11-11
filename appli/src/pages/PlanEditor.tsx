@@ -3,7 +3,7 @@ import { store, useStore } from '../lib/store'
 import { back, navigate } from '../lib/router'
 import type { Session, SessionItem } from '../lib/types'
 import { lastPerformance } from '../lib/stats'
-import { partnerOf, titleSuggestion } from '../lib/sessions'
+import { helperName, needsHelp, partnerOf, titleSuggestion } from '../lib/sessions'
 import { fmtDay, isoDate, uid } from '../lib/util'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseBadges, Seg, Sheet, Stepper } from '../components/ui'
@@ -24,6 +24,7 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
   const { sessions, profiles, meId, exerciseById } = useStore()
   const existing = id ? sessions.find((s) => s.id === id) : undefined
   const partner = partnerOf(profiles, meId)
+  const helper = helperName(profiles)
 
   const [day, setDay] = useState(existing?.date ?? date ?? isoDate())
   const [who, setWho] = useState<Who>(existing ? (existing.ownerId === meId ? 'me' : 'partner') : 'both')
@@ -49,6 +50,8 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
     return [meId, ...(partner ? [partner.id] : [])]
   }, [who, meId, partner])
   const singleOwner = owners.length === 1 ? owners[0] : null
+  // L'aide ne concerne que les séances de la personne qui en a besoin
+  const helpMatters = owners.some((o) => needsHelp(profiles, o))
 
   const specFor = (exerciseId: string): Spec => {
     const ex = exerciseById[exerciseId]
@@ -83,7 +86,7 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
       return [...rest.slice(0, firstHelp), ...help, ...rest.slice(firstHelp)]
     })
 
-  const helpCount = specs.filter((s) => exerciseById[s.exerciseId]?.help).length
+  const helpCount = helpMatters ? specs.filter((s) => exerciseById[s.exerciseId]?.help).length : 0
   const helpIdx = specs.map((s, i) => (exerciseById[s.exerciseId]?.help ? i : -1)).filter((i) => i >= 0)
   const helpGrouped = helpIdx.length < 2 || helpIdx[helpIdx.length - 1] - helpIdx[0] === helpIdx.length - 1
   const autoTitle = titleSuggestion(
@@ -215,7 +218,7 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
               <strong>
                 {helpCount} exercice{helpCount > 1 ? 's' : ''} avec aide
               </strong>{' '}
-              {partner && who !== 'partner' ? `(${partner.name} charge les disques).` : ''}
+              {helper ? `(${helper} charge les disques).` : ''}
               {!helpGrouped ? (
                 <div>
                   <button className="link" onClick={groupHelp}>
@@ -231,12 +234,12 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
           const ex = exerciseById[sp.exerciseId]
           if (!ex) return null
           return (
-            <div key={sp.key} className={`ex-card${ex.help ? ' help' : ''}`}>
+            <div key={sp.key} className={`ex-card${ex.help && helpMatters ? ' help' : ''}`}>
               <div className="ex-head">
                 <div className="grow">
                   <h3>{ex.name}</h3>
                   <div className="meta">
-                    <ExerciseBadges ex={ex} helperName={partner?.name} />
+                    <ExerciseBadges ex={ex} helperName={helper} showHelp={helpMatters} />
                   </div>
                 </div>
                 <div className="row" style={{ gap: 0 }}>
@@ -333,7 +336,7 @@ export function PlanEditor({ id, date }: { id?: string; date?: string }) {
 
       {picking ? (
         <ExercisePicker
-          helperName={partner?.name}
+          helperName={helper}
           onClose={() => setPicking(false)}
           onPick={(ids) => {
             setSpecs((l) => [...l, ...ids.map(specFor)])

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useStore, store } from '../lib/store'
 import { navigate } from '../lib/router'
 import { weeklyStats, sessionPRs } from '../lib/stats'
-import { blankSession, isLive } from '../lib/sessions'
+import { blankSession, isLive, needsHelp } from '../lib/sessions'
 import { addDays, fmtDay, fmtTonnage, isoDate } from '../lib/util'
 import { SessionCard } from '../components/SessionCard'
 import { Avatar, Person } from '../components/ui'
@@ -163,6 +163,7 @@ export function Home() {
                 meId={meId}
                 byId={exerciseById}
                 prs={sessionPRs(sessions, s)}
+                helped={needsHelp(profiles, s.ownerId)}
               />
             ))
           ) : (

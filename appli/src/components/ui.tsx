@@ -35,14 +35,23 @@ export function Person({ profile, you }: { profile?: Profile | null; you?: boole
   )
 }
 
-export function ExerciseBadges({ ex, helperName }: { ex: Exercise; helperName?: string }) {
+export function ExerciseBadges({
+  ex,
+  helperName,
+  showHelp = true,
+}: {
+  ex: Exercise
+  helperName?: string
+  /** Faux pour les séances de quelqu'un qui n'a pas besoin d'aide. */
+  showHelp?: boolean
+}) {
   return (
     <>
       <span className={ex.posture === 'fauteuil' ? 'badge chair' : 'badge'}>
         {ex.posture === 'fauteuil' ? <IconWheelchair /> : null}
         {POSTURE_SHORT[ex.posture]}
       </span>
-      {ex.help ? (
+      {ex.help && showHelp ? (
         <span className="badge help">
           <IconHands />
           {helperName ? `Aide ${helperName}` : 'Aide'}

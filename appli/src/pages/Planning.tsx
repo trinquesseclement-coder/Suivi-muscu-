@@ -1,7 +1,7 @@
 import { useStore } from '../lib/store'
 import { navigate } from '../lib/router'
 import { addDays, fmtDM, isoDate, parseDate, weekStart } from '../lib/util'
-import { isLive } from '../lib/sessions'
+import { isLive, needsHelp } from '../lib/sessions'
 import { personColor } from '../components/ui'
 import { IconBack, IconChevron, IconHands, IconPlus } from '../components/Icons'
 
@@ -73,7 +73,9 @@ export function Planning({ week }: { week?: string }) {
               <div className="stack" style={{ gap: 6 }}>
                 {list.map((s) => {
                   const owner = profiles.find((p) => p.id === s.ownerId)
-                  const help = s.items.filter((it) => exerciseById[it.exerciseId]?.help).length
+                  const help = needsHelp(profiles, s.ownerId)
+                    ? s.items.filter((it) => exerciseById[it.exerciseId]?.help).length
+                    : 0
                   return (
                     <button
                       key={s.id}

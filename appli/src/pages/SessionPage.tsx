@@ -3,10 +3,11 @@ import { store, useStore } from '../lib/store'
 import { back, navigate } from '../lib/router'
 import type { Exercise, Session, SessionItem, SetEntry } from '../lib/types'
 import { doneSets, e1rm, lastPerformance, personalRecords, sessionCardioMin, sessionSetCount, sessionTonnage } from '../lib/stats'
-import { hasProgress, isLive, newItem, partnerOf, resetItem } from '../lib/sessions'
+import { hasProgress, helperName, isLive, needsHelp, newItem, resetItem } from '../lib/sessions'
 import { fmtDay, fmtDM, fmtNum, fmtTonnage, isoDate, uid } from '../lib/util'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseBadges, Person, Sheet, Stepper } from '../components/ui'
+import { restAlert, unlockAudio, useWakeLock } from '../lib/device'
 import { IconBack, IconCheck, IconClose, IconCopy, IconMore, IconPlus, IconTimer, IconTrophy } from '../components/Icons'
 
 const K_REST = 'suivi:rest'
@@ -41,6 +42,9 @@ export function SessionPage({ id }: { id: string }) {
     [sessions, s],
   )
 
+  // Écran allumé pendant sa propre séance (mains moites, transferts…)
+  useWakeLock(!!s && s.ownerId === meId && !s.endedAt)
+
   if (!s) {
     return (
       <div className="stack">
@@ -58,7 +62,8 @@ export function SessionPage({ id }: { id: string }) {
   const owner = profiles.find((p) => p.id === s.ownerId)
   const canEdit = s.ownerId === meId
   const canEditPlan = canEdit || (s.createdBy === meId && s.status === 'planned')
-  const partner = partnerOf(profiles, s.ownerId)
+  const helper = helperName(profiles)
+  const helped = needsHelp(profiles, s.ownerId)
 
   const save = (patch: Partial<Session>) => store.saveSession({ ...s, ...patch })
 
@@ -154,7 +159,8 @@ export function SessionPage({ id }: { id: string }) {
               session={s}
               sessions={sessions}
               editable={canEdit}
-              helperName={partner?.name}
+              helperName={helper}
+              showHelp={helped}
               record={prevRecords[ex.id]?.e1rm ?? 0}
               onChange={(fn, started) => updateItem(it.id, fn, started)}
               onRemove={() => {
@@ -194,7 +200,7 @@ export function SessionPage({ id }: { id: string }) {
         </div>
       ) : null}
 
-      {picking ? <ExercisePicker helperName={partner?.name} onClose={() => setPicking(false)} onPick={addExercises} /> : null}
+      {picking ? <ExercisePicker helperName={helper} onClose={() => setPicking(false)} onPick={addExercises} /> : null}
 
       {finishing ? (
         <FinishSheet
@@ -233,6 +239,7 @@ function ExerciseBlock({
   sessions,
   editable,
   helperName,
+  showHelp,
   record,
   onChange,
   onRemove,
@@ -244,6 +251,7 @@ function ExerciseBlock({
   sessions: Session[]
   editable: boolean
   helperName?: string
+  showHelp: boolean
   record: number
   onChange: (fn: (it: SessionItem) => SessionItem, started?: boolean) => void
   onRemove: () => void
@@ -255,6 +263,13 @@ function ExerciseBlock({
   const setSet = (i: number, patch: Partial<SetEntry>, started = false) =>
     onChange((x) => ({ ...x, sets: x.sets.map((st, j) => (j === i ? { ...st, ...patch } : st)) }), started)
 
+  /** Changer la charge ou les reps d'une série recopie la valeur dans les séries suivantes pas encore faites. */
+  const setValue = (i: number, patch: Pick<Partial<SetEntry>, 'kg' | 'reps'>) =>
+    onChange((x) => ({
+      ...x,
+      sets: x.sets.map((st, j) => (j === i || (j > i && !st.done) ? { ...st, ...patch } : st)),
+    }))
+
   const lastText = last
     ? ex.kind === 'cardio'
       ? `${last.item.cardio?.minutes ?? 0} min${last.item.cardio?.distanceKm ? ` · ${fmtNum(last.item.cardio.distanceKm)} km` : ''}${last.item.cardio?.level ? ` · niv. ${last.item.cardio.level}` : ''}`
@@ -264,12 +279,12 @@ function ExerciseBlock({
     : null
 
   return (
-    <div className={`ex-card${ex.help ? ' help' : ''}`}>
+    <div className={`ex-card${ex.help && showHelp ? ' help' : ''}`}>
       <div className="ex-head">
         <div className="grow">
           <h3>{ex.name}</h3>
           <div className="meta">
-            <ExerciseBadges ex={ex} helperName={helperName} />
+            <ExerciseBadges ex={ex} helperName={helperName} showHelp={showHelp} />
           </div>
         </div>
         {editable ? (
@@ -278,6 +293,11 @@ function ExerciseBlock({
           </button>
         ) : null}
       </div>
+      {ex.note ? (
+        <p className="ex-note">
+          <strong>Réglage :</strong> {ex.note}
+        </p>
+      ) : null}
       {lastText ? (
         <p className="ex-last">
           Dernière fois ({fmtDM(last!.session.date)}) : <span className="tnum">{lastText}</span>
@@ -294,8 +314,8 @@ function ExerciseBlock({
               return editable ? (
                 <div key={i} className={`set-row${st.done ? ' done' : ''}`}>
                   <span className="set-n">{i + 1}</span>
-                  <Stepper label={`Série ${i + 1} charge`} unit="kg" step={step} value={st.kg} onChange={(v) => setSet(i, { kg: v })} />
-                  <Stepper label={`Série ${i + 1} répétitions`} unit="reps" step={1} value={st.reps} onChange={(v) => setSet(i, { reps: v })} />
+                  <Stepper label={`Série ${i + 1} charge`} unit="kg" step={step} value={st.kg} onChange={(v) => setValue(i, { kg: v })} />
+                  <Stepper label={`Série ${i + 1} répétitions`} unit="reps" step={1} value={st.reps} onChange={(v) => setValue(i, { reps: v })} />
                   <button
                     className="check"
                     aria-pressed={st.done}
@@ -304,6 +324,7 @@ function ExerciseBlock({
                       const done = !st.done
                       setSet(i, { done }, done)
                       if (done) {
+                        unlockAudio()
                         onSetDone()
                         navigator.vibrate?.(30)
                       }
@@ -429,13 +450,17 @@ function RestTimer({ end, onAdd, onClose }: { end: number; onAdd: (s: number) =>
   useEffect(() => {
     if (left <= 0 && !buzzed.current) {
       buzzed.current = true
-      navigator.vibrate?.([200, 100, 200])
+      restAlert()
     }
   }, [left])
+  const announce = left <= 0 ? 'Repos terminé, série suivante.' : left <= 10 ? 'Plus que 10 secondes de repos.' : ''
   const abs = Math.abs(left)
   const txt = `${left < 0 ? '+' : ''}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, '0')}`
   return (
     <div className={`timer${left <= 0 ? ' over' : ''}`} role="timer" aria-live="off">
+      <span className="sr-only" aria-live="assertive">
+        {announce}
+      </span>
       <IconTimer width={20} height={20} />
       <span style={{ minWidth: 44 }}>{txt}</span>
       <button onClick={() => onAdd(30)} aria-label="Ajouter 30 secondes">

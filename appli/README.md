@@ -4,7 +4,8 @@ Appli de suivi de séances à deux (Clément & Jules), installable sur le télé
 
 - **Accueil** : prochaine séance, ce que l'autre est en train de faire (« En cours »), le bilan de la semaine de chacun, le fil des dernières séances avec les records battus.
 - **Planning** : semaine par semaine, on planifie pour soi, pour l'autre ou pour les deux d'un coup (chacun avec ses propres charges).
-- **Séance en direct** : gros boutons −/+ pour les kilos et les reps, une case pour valider chaque série, minuteur de repos, rappel de la dernière fois, trophée quand un record tombe. Le cardio se note en minutes / distance / niveau.
+- **Séance en direct** : gros boutons −/+ pour les kilos et les reps (changer une série recopie la valeur dans les suivantes), une case pour valider chaque série, minuteur de repos avec bip, écran qui reste allumé, rappel de la dernière fois et des réglages de la machine, trophée quand un record tombe. Le cardio se note en minutes / distance / niveau.
+- **Profils** : photo, et case « a besoin d'aide pour charger les disques » (par défaut le premier profil créé) : l'appli affiche alors « Aide Jules » sur les deux téléphones.
 - **Tableau de charge** : tonnage par semaine, minutes de cardio, séries par muscle, progression par machine (charge max, 1RM estimé, tonnage) et records. Chaque graphique a sa vue « tableau ».
 - **Machines** : ~70 exercices pour une salle très équipée. Chacun est marqué :
   - *Fauteuil* (faisable sans quitter le fauteuil), *Transfert* (s'installer sur le siège) ou *Debout* ;
@@ -29,7 +30,7 @@ Netlify héberge l'appli, Supabase garde les données partagées et gère les co
 ### 1. Supabase (la base de données)
 
 1. Crée un projet sur [supabase.com](https://supabase.com) (offre gratuite).
-2. **SQL Editor** → *New query* → colle le contenu de [`supabase/schema.sql`](supabase/schema.sql) → *Run*.
+2. **SQL Editor** → *New query* → colle le contenu de [`supabase/schema.sql`](supabase/schema.sql) → *Run*. (Le script est rejouable : relance-le après chaque mise à jour qui le modifie.)
 3. **Authentication → Sign In / Providers → Email** : désactive *Confirm email* (sinon il faut cliquer le lien reçu avant de se connecter).
 4. **Project Settings → API** : note la *Project URL* et la clé *anon* / *publishable*. Elle est publique par nature : c'est la sécurité de la base (RLS) qui protège les données.
 

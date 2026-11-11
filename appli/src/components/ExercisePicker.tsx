@@ -15,7 +15,7 @@ export function ExercisePicker({
   helperName?: string
 }) {
   const { exercises } = useStore()
-  const [filters, setFilters] = useFilters()
+  const [filters, setFilters] = useFilters('suivi:filters:picker')
   const [picked, setPicked] = useState<string[]>([])
   const list = applyFilters(exercises, filters)
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
