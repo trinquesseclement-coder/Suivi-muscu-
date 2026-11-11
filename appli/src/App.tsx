@@ -65,17 +65,16 @@ function TabBar({ route }: { route: Route }) {
           t ? (
             <button
               key={t.label}
+              aria-label={t.label}
               aria-current={route.name === t.route.name ? 'page' : undefined}
               onClick={() => navigate(t.route, { replace: true })}
             >
               <t.icon />
-              {t.label}
+              <span className="lbl">{t.label}</span>
             </button>
           ) : (
-            <button key="plan" aria-label="Planifier une séance" onClick={() => navigate({ name: 'plan' })}>
-              <span className="fab">
-                <IconPlus />
-              </span>
+            <button key="plan" className="fab" aria-label="Planifier une séance" onClick={() => navigate({ name: 'plan' })}>
+              <IconPlus />
             </button>
           ),
         )}

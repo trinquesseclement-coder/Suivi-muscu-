@@ -124,7 +124,7 @@ export function SessionPage({ id }: { id: string }) {
       {s.notes ? <p className="banner">{s.notes}</p> : null}
 
       {s.status === 'done' && progress ? (
-        <div className="tiles">
+        <div className="card tight tiles">
           <div className="tile">
             <div className="v">
               {doneCount}/{s.items.length}

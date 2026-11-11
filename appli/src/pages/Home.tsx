@@ -5,9 +5,9 @@ import { weeklyStats, sessionPRs } from '../lib/stats'
 import { blankSession, isLive } from '../lib/sessions'
 import { addDays, fmtDay, fmtTonnage, isoDate } from '../lib/util'
 import { SessionCard } from '../components/SessionCard'
-import { Person } from '../components/ui'
+import { Person, personColor } from '../components/ui'
 import { SyncPill } from '../components/SyncPill'
-import { IconPlay, IconPlus, IconSettings } from '../components/Icons'
+import { IconDumbbell, IconPlay, IconPlus, IconTimer, IconTrophy } from '../components/Icons'
 
 export function Home() {
   const st = useStore()
@@ -40,13 +40,24 @@ export function Home() {
     <div className="stack-lg">
       <header className="page-head">
         <div className="grow">
-          <h1>Salut {me?.name ?? ''}</h1>
-          <p className="sub">{fmtDay(today)}</p>
+          <p className="welcome">
+            Salut <strong>{me?.name ?? ''}</strong>, voici où vous en êtes cette semaine.
+          </p>
+          <p className="sub" style={{ marginTop: 6 }}>
+            {fmtDay(today)}
+          </p>
         </div>
-        <SyncPill />
-        <button className="icon-btn" aria-label="Réglages" onClick={() => navigate({ name: 'settings' })}>
-          <IconSettings />
-        </button>
+        <div className="stack" style={{ gap: 8, alignItems: 'flex-end', alignSelf: 'flex-start' }}>
+          <button
+            className="avatar"
+            style={{ background: personColor(me) }}
+            aria-label="Réglages"
+            onClick={() => navigate({ name: 'settings' })}
+          >
+            {(me?.name ?? '?').charAt(0).toUpperCase()}
+          </button>
+          <SyncPill />
+        </div>
       </header>
 
       {live ? (
@@ -112,16 +123,25 @@ export function Home() {
               <Person profile={p} you={p.id === meId} />
               <div className="tiles" style={{ marginTop: 8 }}>
                 <div className="tile">
+                  <div className="l">Séances</div>
                   <div className="v">{w.sessions}</div>
-                  <div className="l">séances</div>
+                  <div className="ico">
+                    <IconTrophy />
+                  </div>
                 </div>
                 <div className="tile">
+                  <div className="l">Soulevé</div>
                   <div className="v">{fmtTonnage(w.tonnage)}</div>
-                  <div className="l">soulevés</div>
+                  <div className="ico">
+                    <IconDumbbell />
+                  </div>
                 </div>
                 <div className="tile">
+                  <div className="l">Cardio</div>
                   <div className="v">{w.cardioMin} min</div>
-                  <div className="l">cardio</div>
+                  <div className="ico">
+                    <IconTimer />
+                  </div>
                 </div>
               </div>
             </div>

@@ -436,7 +436,7 @@ export function LineChart({
                   cy={y(p.value)}
                   r={p.date === hover ? 5 : 4}
                   fill={s.color}
-                  stroke="var(--surface)"
+                  stroke="var(--glass-strong)"
                   strokeWidth={2}
                 />
               ))}

@@ -71,4 +71,4 @@ appli/
   netlify/functions/    keep-alive de la base
 ```
 
-Stack : React 19 + TypeScript + Vite, PWA (vite-plugin-pwa), Supabase.
+Stack : React 19 + TypeScript + Vite, PWA (vite-plugin-pwa), Supabase. Thème « sauge » en verre dépoli, police Poppins (embarquée, marche hors ligne).
