@@ -3,6 +3,7 @@ import { store, useStore } from '../lib/store'
 import { back } from '../lib/router'
 import { getSupabaseConfig, setManualSupabaseConfig } from '../lib/supabase'
 import { isoDate } from '../lib/util'
+import { GYM, gymMapsUrl } from '../data/gym'
 import { getRest, setRest } from './SessionPage'
 import { beep, isSoundOn, setSoundOn, unlockAudio } from '../lib/device'
 import { Avatar, Seg, Stepper } from '../components/ui'
@@ -67,6 +68,20 @@ export function Settings() {
         ) : me ? (
           <ProfileEditor profile={me} />
         ) : null}
+      </section>
+
+      <section className="card stack">
+        <h2>Ma salle</h2>
+        <div>
+          <p style={{ fontWeight: 600 }}>{GYM.name}</p>
+          <p className="small muted">{GYM.address}</p>
+          <p className="small muted">
+            {GYM.hours} · {GYM.access}
+          </p>
+        </div>
+        <a className="btn" href={gymMapsUrl()} target="_blank" rel="noreferrer">
+          Itinéraire
+        </a>
       </section>
 
       <section className="card stack">

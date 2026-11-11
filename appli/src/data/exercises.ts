@@ -1,4 +1,4 @@
-import type { Equipment, Exercise, Kind, Muscle, Posture } from '../lib/types'
+import type { Brand, Equipment, Exercise, Kind, Muscle, Posture } from '../lib/types'
 
 /**
  * Catalogue de base pour une salle très équipée.
@@ -91,12 +91,24 @@ const cardio: [id: string, name: string, posture: Posture][] = [
   ['c-rameur', 'Rameur', 'transfert'],
   ['c-skierg', 'SkiErg', 'debout'],
   ['c-skierg-assis', 'SkiErg assis', 'fauteuil'],
-  ['c-ergo-bras', 'Ergomètre à bras', 'fauteuil'],
+  ['c-ergo-bras', 'Ergomètre à bras (Technogym Top)', 'fauteuil'],
   ['c-velo', 'Vélo droit', 'transfert'],
   ['c-velo-allonge', 'Vélo semi-allongé', 'transfert'],
   ['c-air-bike', 'Air bike', 'transfert'],
   ['c-elliptique', 'Elliptique', 'debout'],
 ]
+
+/**
+ * Marque probable chez KOMEX (Dijon) : Technogym pour les machines à plaques,
+ * les poulies et le cardio, Hammer Strength pour les machines à disques.
+ * Le SkiErg est en général un Concept2. À corriger machine par machine.
+ */
+function defaultBrand(equipment: Equipment, id: string): Brand | undefined {
+  if (equipment === 'disques') return 'hammer'
+  if (equipment === 'machine' || equipment === 'poulie') return 'technogym'
+  if (equipment === 'cardio') return id.startsWith('c-skierg') ? 'autre' : 'technogym'
+  return undefined
+}
 
 export const BASE_EXERCISES: Exercise[] = [
   ...muscu.map(([id, name, muscle, posture, help, equipment, step]) => ({
@@ -107,6 +119,7 @@ export const BASE_EXERCISES: Exercise[] = [
     posture,
     help,
     equipment,
+    brand: defaultBrand(equipment, id),
     step,
   })),
   ...cardio.map(([id, name, posture]) => ({
@@ -117,6 +130,7 @@ export const BASE_EXERCISES: Exercise[] = [
     posture,
     help: false,
     equipment: 'cardio' as Equipment,
+    brand: defaultBrand('cardio', id),
   })),
 ]
 
@@ -144,6 +158,18 @@ export const POSTURE_SHORT: Record<Posture, string> = {
   fauteuil: 'Fauteuil',
   transfert: 'Transfert',
   debout: 'Debout',
+}
+
+export const BRAND_LABEL: Record<Brand, string> = {
+  technogym: 'Technogym',
+  hammer: 'Hammer Strength',
+  autre: 'Autre marque',
+}
+
+/** « Hammer Strength · Machine à disques » */
+export function machineLabel(ex: Exercise): string {
+  const brand = ex.brand && ex.brand !== 'autre' ? BRAND_LABEL[ex.brand] : null
+  return brand ? `${brand} · ${EQUIPMENT_LABEL[ex.equipment]}` : EQUIPMENT_LABEL[ex.equipment]
 }
 
 export const EQUIPMENT_LABEL: Record<Equipment, string> = {

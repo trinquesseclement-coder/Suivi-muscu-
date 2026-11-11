@@ -18,6 +18,8 @@ export type Muscle =
 
 export type Equipment = 'machine' | 'disques' | 'poulie' | 'smith' | 'halteres' | 'cardio'
 
+export type Brand = 'technogym' | 'hammer' | 'autre'
+
 export interface Exercise {
   id: string
   name: string
@@ -27,6 +29,8 @@ export interface Exercise {
   /** Il faut quelqu'un pour charger/décharger les disques ou installer. */
   help: boolean
   equipment: Equipment
+  /** Marque de la machine dans votre salle (Technogym, Hammer Strength…). */
+  brand?: Brand
   /** Pas de charge par défaut pour les +/- (kg). */
   step?: number
   note?: string

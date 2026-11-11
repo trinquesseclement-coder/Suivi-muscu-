@@ -1,4 +1,5 @@
 import { useStore } from '../lib/store'
+import { GYM } from '../data/gym'
 import { navigate } from '../lib/router'
 import { addDays, fmtDM, isoDate, parseDate, weekStart } from '../lib/util'
 import { isLive, needsHelp } from '../lib/sessions'
@@ -23,7 +24,7 @@ export function Planning({ week }: { week?: string }) {
         <div className="grow">
           <h1>Planning</h1>
           <p className="sub">
-            Semaine du {fmtDM(start)} au {fmtDM(end)}
+            Semaine du {fmtDM(start)} au {fmtDM(end)} · {GYM.name}
           </p>
         </div>
       </header>

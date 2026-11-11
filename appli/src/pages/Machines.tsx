@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { store, useStore } from '../lib/store'
-import { BASE_EXERCISES, EQUIPMENT_LABEL, MUSCLE_LABEL, POSTURE_LABEL } from '../data/exercises'
-import type { Equipment, Exercise, Muscle, Posture } from '../lib/types'
+import { BASE_EXERCISES, BRAND_LABEL, EQUIPMENT_LABEL, machineLabel, MUSCLE_LABEL, POSTURE_LABEL } from '../data/exercises'
+import { GYM } from '../data/gym'
+import type { Brand, Equipment, Exercise, Muscle, Posture } from '../lib/types'
 import { helperName } from '../lib/sessions'
 import { uid } from '../lib/util'
 import { applyFilters, ExerciseFilters, useFilters } from '../components/ExerciseFilters'
@@ -22,7 +23,9 @@ export function Machines() {
       <header className="page-head">
         <div className="grow">
           <h1>Machines</h1>
-          <p className="sub">{exercises.length} exercices · touche pour corriger</p>
+          <p className="sub">
+            {GYM.name} · {exercises.length} exercices · touche pour corriger
+          </p>
         </div>
         <button
           className="icon-btn"
@@ -65,6 +68,9 @@ export function Machines() {
                     <span className="meta">
                       {ex.kind === 'muscu' ? <span className="badge">{MUSCLE_LABEL[ex.muscle]}</span> : null}
                       <ExerciseBadges ex={ex} helperName={helper} />
+                    </span>
+                    <span className="small muted" style={{ display: 'block', marginTop: 4 }}>
+                      {machineLabel(ex)}
                     </span>
                     {ex.note ? (
                       <span className="small muted" style={{ display: 'block', marginTop: 4 }}>
@@ -191,6 +197,20 @@ function ExerciseEditor({ ex, onClose, helperName }: { ex: Exercise; onClose: ()
                       {EQUIPMENT_LABEL[k]}
                     </option>
                   ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Marque</span>
+              <select
+                className="input"
+                value={draft.brand ?? 'autre'}
+                onChange={(e) => set({ brand: e.target.value as Brand })}
+              >
+                {(Object.keys(BRAND_LABEL) as Brand[]).map((b) => (
+                  <option key={b} value={b}>
+                    {BRAND_LABEL[b]}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="field">

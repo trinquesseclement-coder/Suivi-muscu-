@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useStore, store } from '../lib/store'
+import { GYM } from '../data/gym'
 import { navigate } from '../lib/router'
 import { weeklyStats, sessionPRs } from '../lib/stats'
 import { blankSession, isLive, needsHelp } from '../lib/sessions'
@@ -44,7 +45,7 @@ export function Home() {
             Salut <strong>{me?.name ?? ''}</strong>, voici où vous en êtes cette semaine.
           </p>
           <p className="sub" style={{ marginTop: 6 }}>
-            {fmtDay(today)}
+            {fmtDay(today)} · {GYM.name}
           </p>
         </div>
         <div className="stack" style={{ gap: 8, alignItems: 'flex-end', alignSelf: 'flex-start' }}>

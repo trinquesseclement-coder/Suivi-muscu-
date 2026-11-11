@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EQUIPMENT_LABEL, MUSCLE_LABEL } from '../data/exercises'
+import { machineLabel, MUSCLE_LABEL } from '../data/exercises'
 import { useStore } from '../lib/store'
 import { ExerciseBadges, Sheet } from './ui'
 import { applyFilters, ExerciseFilters, useFilters } from './ExerciseFilters'
@@ -45,7 +45,7 @@ export function ExercisePicker({
                   <span className="meta">
                     <span className="badge">{MUSCLE_LABEL[ex.muscle]}</span>
                     <ExerciseBadges ex={ex} helperName={helperName} />
-                    <span className="faint small">{EQUIPMENT_LABEL[ex.equipment]}</span>
+                    <span className="faint small">{machineLabel(ex)}</span>
                   </span>
                 </span>
               </button>
