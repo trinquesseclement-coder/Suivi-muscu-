@@ -66,6 +66,15 @@ struct LoadView: View {
             .scrollIndicators(.hidden)
             // Mise au point : `-load-scroll` ouvre la page sur une carte.
             .task { if let anchor = Launch.scroll { reader.scrollTo(anchor, anchor: .top) } }
+            // Mise au point : `-load-switch <secondes>` change de personne 4 fois à ce rythme (le
+            // sélecteur est hors de l'écran quand on regarde les graphiques de kilos).
+            .task {
+                guard let seconds = Launch.switchEvery else { return }
+                for _ in 0..<4 {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    showPartner.toggle()
+                }
+            }
         }
     }
 
@@ -155,6 +164,7 @@ struct LoadView: View {
                           axisLabel: { $0 == 0 ? "0" : Format.tonnage($0) },
                           accessibilityTitle: "Tonnage par semaine",
                           accessibilitySummary: summary(weeks.map(\.tonnage), Format.tonnage))
+                .personChart(person)
         } table: {
             DataTable(head: ["Semaine", "Tonnage"], rows: weeks.map { [Format.dayMonth($0.week), Format.tonnage($0.tonnage)] })
         }
@@ -174,6 +184,7 @@ struct LoadView: View {
                           axisLabel: { "\(Int($0))" },
                           accessibilityTitle: "Cardio par semaine, en minutes",
                           accessibilitySummary: summary(weeks.map { Double($0.cardioMinutes) }) { "\(Int($0)) min" })
+                .personChart(person)
         } table: {
             DataTable(head: ["Semaine", "Minutes"], rows: weeks.map { [Format.dayMonth($0.week), "\($0.cardioMinutes) min"] })
         }
@@ -191,6 +202,7 @@ struct LoadView: View {
                                                 : "Pas de série de muscu cette semaine") : nil,
                          startsWithTable: Launch.table == "muscles") {
             MuscleSetsChart(rows: rows, color: Theme.color(for: person), personId: person.id)
+                .personChart(person)
         } table: {
             DataTable(head: ["Muscle", "Séries"], rows: rows.map { [$0.muscle, "\($0.sets)"] })
         }
@@ -202,9 +214,19 @@ struct LoadView: View {
     }
 }
 
+private extension View {
+    /// Un graphique neuf par personne pour les cartes de kilos (tonnage, cardio, muscles) : au changement
+    /// de personne, l'ancien disparaît d'un coup et le nouveau fait son entrée depuis zéro (ou apparaît
+    /// en fondu avec « Réduire les animations ») — jamais les valeurs de l'un mêlées à celles de l'autre.
+    /// Les séances et heures, qui peuvent montrer les deux, gardent leur graphique.
+    func personChart(_ person: Profile) -> some View {
+        id(person.id).transition(.identity)
+    }
+}
+
 /// Mise au point (DEBUG) : `-load-person partner`, `-load-together`, `-load-table <sessions|tonnage|
 /// cardio|muscles|progress>`, `-load-machine <id>`, `-load-measure <top|e1rm|tonnage>`,
-/// `-load-scroll <tonnage|muscles|progress|records>`.
+/// `-load-scroll <tonnage|muscles|progress|records>`, `-load-switch <secondes>`.
 private enum Launch {
     private static func value(_ flag: String) -> String? {
         #if DEBUG
@@ -229,5 +251,6 @@ private enum Launch {
     static var table: String? { value("-load-table") }
     static var machine: String? { value("-load-machine") }
     static var scroll: String? { value("-load-scroll") }
+    static var switchEvery: Double? { value("-load-switch").flatMap(Double.init) }
     static var measure: LoadMeasure { value("-load-measure").flatMap(LoadMeasure.init(rawValue:)) ?? .top }
 }

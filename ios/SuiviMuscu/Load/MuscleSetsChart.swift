@@ -19,6 +19,9 @@ struct MuscleSetsChart: View {
 
     static let band = 10.0...20.0
 
+    /// Longueur affichée, par personne et muscle : jamais celle de l'autre personne.
+    private func key(_ muscle: String) -> String { "\(personId)|\(muscle)" }
+
     private var top: Double { max(Self.band.upperBound + 4, Double(rows.map(\.sets).max() ?? 0) * 1.15) }
 
     /// Identité des données : en changer refait pousser les barres.
@@ -38,7 +41,7 @@ struct MuscleSetsChart: View {
         .accessibilityValue(rows.map { "\($0.muscle) \($0.sets) série\($0.sets > 1 ? "s" : "")" }
             .joined(separator: ", "))
         .chartEntrance(key: dataKey, reset: { shown = [:]; visible = false }) { reduce in
-            await grow(groups: rows.map { [($0.muscle, Double($0.sets))] }, into: $shown, visible: $visible,
+            await grow(groups: rows.map { [(key($0.muscle), Double($0.sets))] }, into: $shown, visible: $visible,
                        reduceMotion: reduce)
         }
     }
@@ -48,7 +51,7 @@ struct MuscleSetsChart: View {
             RectangleMark(xStart: .value("Repère", Self.band.lowerBound), xEnd: .value("Repère", Self.band.upperBound))
                 .foregroundStyle(Theme.ink.opacity(0.07))
             ForEach(rows, id: \.muscle) { row in
-                let value = reduceMotion ? Double(row.sets) : (shown[row.muscle] ?? 0)
+                let value = reduceMotion ? Double(row.sets) : (shown[key(row.muscle)] ?? 0)
                 BarMark(x: .value("Séries", value), y: .value("Muscle", row.muscle), height: .ratio(0.6))
                     .foregroundStyle(color)
                     .cornerRadius(4)

@@ -21,9 +21,10 @@ struct ProgressPoint: Hashable {
 }
 
 /// Courbe d'une machine pour une personne, avec ses points et la dernière valeur écrite.
-/// Elle se dessine de gauche à droite quand elle arrive à l'écran et au changement de personne ; changer
-/// de mesure ou de machine fait glisser la courbe vers les nouvelles valeurs (fondu enchaîné avec
-/// « Réduire les animations »).
+/// Elle se dessine de gauche à droite quand elle arrive à l'écran ; changer de mesure ou de machine fait
+/// glisser la courbe vers les nouvelles valeurs (fondu enchaîné avec « Réduire les animations »).
+/// Au changement de personne, `MachineProgressCard` en crée une neuve (`.id`) : jamais les kilos de
+/// l'un qui glissent vers ceux de l'autre.
 struct ProgressChart: View {
     let points: [ProgressPoint]
     let color: Color
@@ -176,11 +177,15 @@ struct MachineProgressCard: View {
                 ProgressChart(points: data.points, color: Theme.color(for: person), format: data.format,
                               revealKey: person.id,
                               accessibilityTitle: "\(exercise.name), \(data.title)")
+                    // Une courbe neuve par personne : elle ne glisse pas des kilos de l'un vers ceux de
+                    // l'autre (ni fondu enchaîné qui superpose les deux). La carte, elle, garde son état.
+                    .id(person.id)
+                    .transition(.identity)
             } table: {
                 DataTable(head: ["Date", data.title], rows: data.rows)
             }
         } else {
-            ChartCard(title: "Progression par machine", empty: (.machines, "Pas encore fait")) {
+            ChartCard(title: "Progression par machine", empty: (.machines, "Aucune machine faite pour l’instant")) {
                 EmptyView()
             } table: {
                 EmptyView()
