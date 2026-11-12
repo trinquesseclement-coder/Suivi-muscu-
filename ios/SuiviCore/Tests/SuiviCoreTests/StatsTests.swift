@@ -105,6 +105,15 @@ import Testing
         #expect(Stats.formatHours(125) == "2h05")
     }
 
+    /// Libellé au-dessus d'une barre (environ 36 pt) : « 45m » au lieu de « 45 min ».
+    @Test func formatHoursCompact() {
+        #expect(Stats.formatHoursCompact(165) == "2h45")
+        #expect(Stats.formatHoursCompact(60) == "1h")
+        #expect(Stats.formatHoursCompact(45) == "45m")
+        #expect(Stats.formatHoursCompact(0) == "0m")
+        #expect(Stats.formatHoursCompact(125) == "2h05")
+    }
+
     @Test func e1rmAndTonnage() {
         #expect(Stats.e1rm(kg: 60, reps: 1) == 60)
         #expect(Stats.e1rm(kg: 60, reps: 0) == 0)

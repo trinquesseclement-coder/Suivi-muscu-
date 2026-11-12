@@ -5,9 +5,11 @@ import SuiviCore
 
 /// « Pour qui » : contrôle segmenté de 48 pt, même style que le choix du schéma.
 /// En très grand texte, les choix s'empilent pour que « Les deux » reste entier.
-struct WhoPicker: View {
-    let options: [(PlanTarget, String)]
-    @Binding var selection: PlanTarget
+/// Sert aussi au tableau de charge (personne, mesure).
+struct WhoPicker<Value: Hashable>: View {
+    let options: [(Value, String)]
+    @Binding var selection: Value
+    var font: Font = Theme.font(.body, weight: .semibold)
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -22,7 +24,7 @@ struct WhoPicker: View {
                     selection = value
                 } label: {
                     Text(title)
-                        .font(Theme.font(.body, weight: .semibold))
+                        .font(font)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         // Le texte réduit ne touche jamais le bord de la pastille.

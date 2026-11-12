@@ -84,7 +84,9 @@ struct RootView: View {
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
                          onPlan: { date in path.append(PlanRoute(date: date)) },
                          onEditPlan: { id in path.append(PlanRoute(sessionId: id)) })
-        case .load, .machines:
+        case .load:
+            LoadView()
+        case .machines:
             ComingSoon(tab: tab)
         }
     }
@@ -120,7 +122,7 @@ struct RootView: View {
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
     /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
-    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` choisit l'onglet
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` (ou `load`) choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -215,9 +217,8 @@ private struct ComingSoon: View {
 
     private var text: String {
         switch tab {
-        case .load: "Le tableau de charge arrive : tes séances, tes heures et ta progression machine par machine."
         case .machines: "Le catalogue des machines arrive : photos, réglages du siège et corrections."
-        case .home, .planning: ""
+        case .home, .planning, .load: ""
         }
     }
 
