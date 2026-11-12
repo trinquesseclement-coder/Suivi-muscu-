@@ -38,6 +38,16 @@ public enum Format {
         return wd.prefix(1).uppercased() + wd.dropFirst() + " \(p.day) \(monthsLong[p.month - 1])"
     }
 
+    /// Le jour en un mot : « Aujourd’hui », « Hier », « Demain », sinon « Samedi » ; vide si illisible.
+    public static func dayWord(_ iso: String, today: String) -> String {
+        if iso == today { return "Aujourd’hui" }
+        if iso == Dates.addDays(today, -1) { return "Hier" }
+        if iso == Dates.addDays(today, 1) { return "Demain" }
+        guard parts(iso) != nil, let d = Dates.parse(iso) else { return "" }
+        let wd = weekdays[Dates.calendar.component(.weekday, from: d) - 1]
+        return wd.prefix(1).uppercased() + wd.dropFirst()
+    }
+
     /// Jour de la semaine abrégé, comme la colonne du planning web : « Lun », « Jeu ».
     public static func weekdayShort(_ iso: String) -> String {
         guard let d = Dates.parse(iso) else { return "" }

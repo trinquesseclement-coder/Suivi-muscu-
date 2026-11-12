@@ -29,7 +29,7 @@ struct CopySessionSheet: View {
                         }
                     }
                     .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.6)))
+                        .fill(Theme.softFill))
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -38,7 +38,7 @@ struct CopySessionSheet: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Color(hex: 0xECF1EF).ignoresSafeArea())
+        .background(Theme.sheetBackground.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

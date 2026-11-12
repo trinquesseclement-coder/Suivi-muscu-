@@ -132,6 +132,12 @@ public enum Rules {
         s.status == .planned && s.createdBy == meId && s.startedAt == nil && !hasProgress(s)
     }
 
+    /// « Modifier la séance » depuis l'écran de séance : une séance prévue modifiable, mais pas une
+    /// séance libre tout juste créée par « + » ni une séance vide (elle serait jetée en quittant l'écran).
+    public static func offersPlanEdit(_ s: Session, meId: String, fresh: Bool) -> Bool {
+        !fresh && !s.items.isEmpty && isEditablePlan(s, meId: meId)
+    }
+
     static func parseTimestamp(_ string: String) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

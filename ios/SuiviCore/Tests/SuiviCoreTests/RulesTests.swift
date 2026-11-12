@@ -267,4 +267,17 @@ import Testing
         #expect(!Rules.isEditablePlan(planned(createdBy: "p2"), meId: "p1"))
         #expect(!Rules.isEditablePlan(doneSession("d", owner: "p1", items: [item([set(40, 10)])]), meId: "p1"))
     }
+
+    /// « Modifier la séance » dans la séance : pas sur une séance libre tout juste créée, ni vide.
+    @Test func offersPlanEditFromSession() {
+        let full = Session(id: "s", ownerId: "p1", createdBy: "p1", date: "2026-11-13", title: "Séance",
+                           status: .planned, items: [item([set(40, 10, false)])],
+                           updatedAt: "2026-11-10T10:00:00.000Z")
+        var empty = full
+        empty.items = []
+        #expect(Rules.offersPlanEdit(full, meId: "p1", fresh: false))
+        #expect(!Rules.offersPlanEdit(full, meId: "p1", fresh: true))
+        #expect(!Rules.offersPlanEdit(empty, meId: "p1", fresh: false))
+        #expect(!Rules.offersPlanEdit(full, meId: "p2", fresh: false))
+    }
 }

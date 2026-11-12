@@ -222,7 +222,7 @@ struct SessionView: View {
 
     private func optionsMenu(_ s: Session, editable: Bool) -> some View {
         Menu {
-            if Rules.isEditablePlan(s, meId: store.meId) {
+            if Rules.offersPlanEdit(s, meId: store.meId, fresh: fresh) {
                 Button { onEditPlan(s.id) } label: {
                     Label { Text("Modifier la séance") } icon: { AppIcon.planning.image }
                 }

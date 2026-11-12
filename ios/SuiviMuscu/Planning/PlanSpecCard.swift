@@ -16,16 +16,9 @@ struct PlanSpecCard: View {
     let onMove: (_ offset: Int) -> Void
     let onRemove: () -> Void
 
-    @Environment(\.dynamicTypeSize) private var typeSize
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             head
-            if typeSize.isAccessibilitySize {
-                // En très grand texte, les boutons passent sous le nom pour lui laisser la largeur.
-                HStack(spacing: 0) { Spacer(minLength: 0); buttons }
-                    .padding(.top, -8)
-            }
             Divider().overlay(Theme.ink.opacity(0.08))
             settings
         }
@@ -52,14 +45,12 @@ struct PlanSpecCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(exercise.name)
                     .font(Theme.font(.headline, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
                     .accessibilityAddTraits(.isHeader)
                 FlowLayout(spacing: 6) { badges }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if !typeSize.isAccessibilitySize {
-                buttons.padding(.top, -6).padding(.trailing, -8)
-            }
+            optionsMenu
         }
     }
 
@@ -74,34 +65,38 @@ struct PlanSpecCard: View {
         }
     }
 
-    private var buttons: some View {
-        HStack(spacing: 0) {
-            iconButton(.up, label: "Monter", enabled: canMoveUp) { onMove(-1) }
-            iconButton(.down, label: "Descendre", enabled: canMoveDown) { onMove(1) }
-            iconButton(.close, label: "Retirer", enabled: true, action: onRemove)
-        }
-    }
-
-    private func iconButton(_ icon: AppIcon, label: String, enabled: Bool,
-                            action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            icon.image
-                .font(Theme.icon(16, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+    /// « … » : monter, descendre ou retirer, comme le menu de la carte de séance (`ExerciseCard`).
+    /// Un seul bouton de 48 pt laisse la largeur au nom de l'exercice.
+    private var optionsMenu: some View {
+        Menu {
+            Button { onMove(-1) } label: {
+                Label { Text("Monter") } icon: { AppIcon.up.image }
+            }
+            .disabled(!canMoveUp)
+            Button { onMove(1) } label: {
+                Label { Text("Descendre") } icon: { AppIcon.down.image }
+            }
+            .disabled(!canMoveDown)
+            Button(role: .destructive, action: onRemove) {
+                Label { Text("Retirer") } icon: { AppIcon.delete.image }
+            }
+        } label: {
+            AppIcon.more.image
+                .font(Theme.icon(17, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
                 .frame(width: Theme.minTouch, height: Theme.minTouch)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(PressableStyle())
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.3)
-        .accessibilityLabel("\(label) \(exercise.name)")
+        .padding(.top, -10)
+        .padding(.trailing, -12)
+        .accessibilityLabel("Options de \(exercise.name)")
     }
 
     // MARK: Réglages
 
     @ViewBuilder private var settings: some View {
         if exercise.kind == .cardio {
-            labeled("Durée") {
+            labeled("Minutes") {
                 Stepper(label: "Minutes", unit: "min", step: 5, value: minutes, range: 5...240)
             }
         } else if !single {
@@ -121,18 +116,12 @@ struct PlanSpecCard: View {
         }
     }
 
-    /// Trois steppers côte à côte s'il y a la place, sinon « Séries » et « Reps » puis « Charge ».
+    /// « Séries » et « Reps » côte à côte, puis « Charge » : trois steppers sur une ligne ne
+    /// laisseraient pas de place au chiffre entre les boutons de 48 pt.
     private var classic: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 8) {
-                setsStepper.frame(minWidth: 132)
-                repsStepper.frame(minWidth: 132)
-                loadStepper.frame(minWidth: 132)
-            }
-            VStack(spacing: 10) {
-                HStack(alignment: .top, spacing: 8) { setsStepper; repsStepper }
-                loadStepper
-            }
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 8) { setsStepper; repsStepper }
+            loadStepper
         }
     }
 

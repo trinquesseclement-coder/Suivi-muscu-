@@ -15,6 +15,8 @@ struct PlanEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var loaded = false
+    /// La séance à modifier n'existe plus (supprimée, ou jamais trouvée) : on quitte l'écran.
+    @State private var missing = false
     /// Date d'origine d'une séance existante : la seule date passée qu'on peut garder.
     @State private var originalDate: String?
     @State private var day = Dates.isoDate(Date())
@@ -46,11 +48,20 @@ struct PlanEditorView: View {
     private var helpMatters: Bool { owners.contains(where: Rules.profileNeedsHelp) }
 
     var body: some View {
+        Group {
+            if missing { Color.clear } else { editor }
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear(perform: load)
+    }
+
+    private var editor: some View {
         let byId = store.exerciseAnyById
         let today = Dates.isoDate(Date())
         let helper = Rules.helperName(store.profiles)
 
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 field("Date") { dateRow(today: today) }
@@ -97,10 +108,11 @@ struct PlanEditorView: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .background(Theme.background.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear(perform: load)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            PlanEditorBottomBar(label: isEdit ? "Enregistrer" : target == .both ? "Planifier pour les deux" : "Planifier",
+                                enabled: !specs.isEmpty, showsDelete: isEdit, confirmDelete: $confirmDelete,
+                                onSave: save, onDelete: delete)
+        }
         .sheet(isPresented: $picking) {
             ExercisePicker(owner: singleOwner ?? owners.first(where: Rules.profileNeedsHelp) ?? store.me) { add($0) }
         }
@@ -160,8 +172,8 @@ struct PlanEditorView: View {
                 AppIcon.planning.image
                     .font(Theme.icon(17, weight: .semibold))
                     .foregroundStyle(Theme.ink2)
-                // Le jour seul (« Demain », « Samedi ») : le sélecteur montre déjà la date complète.
-                Text(Format.day(day, today: today).split(separator: " ").first.map(String.init) ?? "")
+                // Le jour en un mot (« Demain », « Samedi ») : le sélecteur montre la date complète.
+                Text(Format.dayWord(day, today: today))
                     .font(Theme.font(.body, weight: .semibold))
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -191,17 +203,22 @@ struct PlanEditorView: View {
                 HStack(alignment: .center, spacing: 8) {
                     exercisesTitle
                     Spacer(minLength: 8)
-                    copyButton
+                    copyButton(wraps: false)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     exercisesTitle
-                    copyButton
+                    copyButton(wraps: true)
                 }
             }
 
             if helpMatters && PlanBuilder.helpIsScattered(specs, byId: byId) {
-                groupingBanner(byId: byId, helper: helper)
-                    .transition(.opacity)
+                HelpGroupingBanner(count: specs.filter { byId[$0.exerciseId]?.help == true }.count,
+                                   helper: helper) {
+                    withAnimation(reduceMotion ? Motion.reduced : Motion.spring) {
+                        specs = PlanBuilder.groupingHelp(specs, byId: byId)
+                    }
+                }
+                .transition(.opacity)
             }
 
             ForEach(Array(specs.enumerated()), id: \.element.id) { i, sp in
@@ -238,104 +255,28 @@ struct PlanEditorView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private var copyButton: some View {
+    /// Sur une ligne à côté du titre ; sous le titre (très grand texte), le libellé peut passer à la ligne.
+    private func copyButton(wraps: Bool) -> some View {
         Button { copying = true } label: {
             HStack(spacing: 6) {
                 AppIcon.copy.image.font(Theme.icon(14, weight: .semibold))
-                Text("Reprendre une séance").lineLimit(1).minimumScaleFactor(0.8)
+                Text("Reprendre une séance")
+                    .lineLimit(wraps ? nil : 1)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: wraps)
             }
             .font(Theme.font(.subheadline, weight: .semibold))
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 14)
+            .padding(.vertical, wraps ? 8 : 0)
             .frame(minHeight: 40)
-            .background(Capsule().fill(Theme.glass))
-            .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous).fill(Theme.glass))
+            .overlay(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
+                .strokeBorder(Theme.glassBorder, lineWidth: 1))
             .frame(minHeight: Theme.minTouch)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
-    }
-
-    private func groupingBanner(byId: [String: Exercise], helper: String?) -> some View {
-        let count = specs.filter { byId[$0.exerciseId]?.help == true }.count
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                AppIcon.help.image.font(Theme.icon(16, weight: .semibold))
-                (Text("\(count) exercices avec aide").bold()
-                    + Text(helper.map { " (\($0) charge les disques) : les enchaîner évite de l’attendre." }
-                        ?? " : les enchaîner évite d’attendre."))
-                    .font(Theme.font(.subheadline))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Button {
-                withAnimation(reduceMotion ? Motion.reduced : Motion.spring) {
-                    specs = PlanBuilder.groupingHelp(specs, byId: byId)
-                }
-            } label: {
-                Text(helper.map { "Regrouper les exercices avec \($0)" } ?? "Regrouper les exercices avec aide")
-                    .font(Theme.font(.subheadline, weight: .semibold))
-                    .foregroundStyle(Color.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, minHeight: Theme.minTouch)
-                    .background(Capsule().fill(Theme.ink))
-            }
-            .buttonStyle(PressableStyle())
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-            .fill(Color(hex: 0xF6E6DC)))
-        .foregroundStyle(Theme.ink)
-    }
-
-    // MARK: Barre du bas
-
-    private var bottomBar: some View {
-        let label = isEdit ? "Enregistrer" : target == .both ? "Planifier pour les deux" : "Planifier"
-        let enabled = !specs.isEmpty
-        return HStack(spacing: 8) {
-            if isEdit {
-                Button { confirmDelete = true } label: {
-                    Text("Supprimer")
-                        .font(Theme.font(.headline, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0xB3261E))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .padding(.horizontal, 22)
-                        .frame(minHeight: 52)
-                        .background(Capsule().fill(Color.white.opacity(0.9)))
-                        .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.1), lineWidth: 1))
-                }
-                .buttonStyle(PressableStyle())
-                // Accrochée au bouton : la bulle de confirmation pointe vers lui.
-                .confirmationDialog("Supprimer cette séance prévue ?", isPresented: $confirmDelete,
-                                    titleVisibility: .visible) {
-                    Button("Supprimer la séance", role: .destructive, action: delete)
-                    Button("Annuler", role: .cancel) {}
-                }
-            }
-            Button(action: save) {
-                Text(label)
-                    .font(Theme.font(.headline, weight: .semibold))
-                    .foregroundStyle(Color.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Capsule().fill(Theme.ink.opacity(enabled ? 1 : 0.35)))
-            }
-            .buttonStyle(PressableStyle())
-            .disabled(!enabled)
-            .accessibilityHint(enabled ? "" : "Ajoute au moins un exercice")
-        }
-        .padding(5)
-        .background(Capsule().fill(Theme.barFill))
-        .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
-        .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .padding(.bottom, 6)
-        .background { BottomFade() }
     }
 
     // MARK: Actions
@@ -343,6 +284,12 @@ struct PlanEditorView: View {
     private func load() {
         guard !loaded else { return }
         loaded = true
+        if isEdit && existing == nil {
+            // Rien à modifier : ne jamais montrer un éditeur qui créerait une nouvelle séance.
+            missing = true
+            dismiss()
+            return
+        }
         if let s = existing {
             originalDate = s.date
             day = s.date
@@ -399,6 +346,11 @@ struct PlanEditorView: View {
 
     private func save() {
         guard !specs.isEmpty else { return }
+        // Séance disparue pendant la modification : on n'en crée surtout pas une nouvelle.
+        if isEdit && existing == nil {
+            dismiss()
+            return
+        }
         let now = Date()
         let byId = store.exerciseAnyById
         if let s = existing, let owner = singleOwner {
@@ -414,7 +366,7 @@ struct PlanEditorView: View {
     }
 
     private func delete() {
-        guard let sessionId else { return }
+        guard let sessionId, existing != nil else { dismiss(); return }
         store.deleteSession(id: sessionId)
         onDone(day)
     }
@@ -441,38 +393,5 @@ struct PlanEditorView: View {
         }
         if args.contains("-plan-copy") { copying = true }
         #endif
-    }
-}
-
-/// « Pour qui » : contrôle segmenté de 48 pt, même style que le choix du schéma.
-private struct WhoPicker: View {
-    let options: [(PlanTarget, String)]
-    @Binding var selection: PlanTarget
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(options, id: \.0) { value, title in
-                let active = selection == value
-                Button {
-                    selection = value
-                } label: {
-                    Text(title)
-                        .font(Theme.font(.body, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .foregroundStyle(active ? Color.white : Theme.ink2)
-                        .frame(maxWidth: .infinity, minHeight: Theme.minTouch)
-                        .background(Capsule().fill(active ? Theme.ink : Color.clear))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(active ? .isSelected : [])
-            }
-        }
-        .padding(4)
-        .background(Capsule().fill(Theme.glass))
-        .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
-        .motion(Motion.spring, value: selection)
-        .sensoryFeedback(.selection, trigger: selection)
     }
 }
