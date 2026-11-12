@@ -62,18 +62,18 @@ struct RootView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             tabButton(.home)
             tabButton(.planning)
             addButton
             tabButton(.load)
             tabButton(.machines)
         }
-        .padding(6)
+        .padding(4)
         .background(Capsule().fill(Theme.glass))
         .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
         .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.bottom, 8)
     }
 
@@ -83,17 +83,17 @@ struct RootView: View {
             if tab != t { bounce += 1 }
             withAnimation(reduceMotion ? Motion.reduced : Motion.spring) { tab = t }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 t.icon.image
                     .font(.system(size: 20, weight: .medium))
                     .symbolEffect(.bounce, options: .nonRepeating, isActive: active && !reduceMotion && bounce > 0)
                 if active {
                     Text(t.label).font(Theme.font(.subheadline, weight: .medium))
-                        .lineLimit(1).fixedSize()
+                        .lineLimit(1).minimumScaleFactor(0.75)
                 }
             }
-            .padding(.horizontal, active ? 18 : 0)
-            .frame(minWidth: Theme.minTouch + 4, minHeight: Theme.minTouch + 4)
+            .padding(.horizontal, active ? 12 : 0)
+            .frame(minWidth: Theme.minTouch, minHeight: Theme.minTouch)
             .foregroundStyle(active ? Color.white : Theme.ink)
             .background(Capsule().fill(active ? Theme.ink : Color.white.opacity(0.55)))
             .overlay(Capsule().strokeBorder(Theme.ink.opacity(active ? 0 : 0.7), lineWidth: 1.5))
@@ -108,7 +108,7 @@ struct RootView: View {
             AppIcon.add.image
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: Theme.minTouch + 4, height: Theme.minTouch + 4)
+                .frame(width: Theme.minTouch, height: Theme.minTouch)
                 .background(Circle().fill(Theme.orange))
         }
         .buttonStyle(.plain)
