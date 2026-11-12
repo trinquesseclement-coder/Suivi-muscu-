@@ -59,4 +59,13 @@ import Testing
         #expect(Format.load(40) == "40")
         #expect(Format.load(0.1 + 0.2) == "0,3")
     }
+
+    /// Colonne des jours du planning : « Lun » au-dessus de « 9 ».
+    @Test func weekdayShortAndDayOfMonth() {
+        #expect(Format.weekdayShort("2026-11-09") == "Lun")
+        #expect(Format.weekdayShort("2026-11-12") == "Jeu")
+        #expect(Format.weekdayShort("2026-11-15") == "Dim")
+        #expect(Format.dayOfMonth("2026-11-09") == "9")
+        #expect(Format.dayOfMonth("2026-11-15") == "15")
+    }
 }

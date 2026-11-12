@@ -38,6 +38,19 @@ public enum Format {
         return wd.prefix(1).uppercased() + wd.dropFirst() + " \(p.day) \(monthsLong[p.month - 1])"
     }
 
+    /// Jour de la semaine abrégé, comme la colonne du planning web : « Lun », « Jeu ».
+    public static func weekdayShort(_ iso: String) -> String {
+        guard let d = Dates.parse(iso) else { return "" }
+        let wd = weekdays[Dates.calendar.component(.weekday, from: d) - 1]
+        return wd.prefix(1).uppercased() + wd.dropFirst().prefix(2)
+    }
+
+    /// Numéro du jour dans le mois : « 9 », « 15 ».
+    public static func dayOfMonth(_ iso: String) -> String {
+        guard let p = parts(iso) else { return iso }
+        return String(p.day)
+    }
+
     /// Nombre à une décimale au plus, virgule française : 5.4 → « 5,4 », 5.0 → « 5 ».
     public static func number(_ n: Double) -> String {
         let r = (n * 10).rounded() / 10

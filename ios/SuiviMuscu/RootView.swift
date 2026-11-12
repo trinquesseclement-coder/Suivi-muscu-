@@ -29,6 +29,8 @@ struct RootView: View {
     @State private var tab: AppTab = .home
     @State private var bounce = 0
     @State private var path: [SessionRoute] = []
+    /// Une date de la semaine affichée par le Planning (aujourd'hui au départ).
+    @State private var planningWeek = Dates.isoDate(Date())
     @Namespace private var zoom
 
     @State private var showSettings = false
@@ -76,7 +78,16 @@ struct RootView: View {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
                      onAvatar: { showSettings = true })
-        case .planning, .load, .machines:
+        case .planning:
+            PlanningView(week: $planningWeek, zoom: zoom,
+                         onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
+                         onPlan: { _ in
+                             // Tâche 5 : ouvre l'éditeur
+                         },
+                         onEditPlan: { _ in
+                             // Tâche 5 : ouvre l'éditeur
+                         })
+        case .load, .machines:
             ComingSoon(tab: tab)
         }
     }
@@ -97,11 +108,19 @@ struct RootView: View {
     }
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
-    /// `-open-session <id>` ouvre une séance précise.
+    /// `-open-session <id>` ouvre une séance précise, `-open-tab planning` choisit l'onglet
+    /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
         guard path.isEmpty else { return }
         let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-open-tab"), i + 1 < args.count,
+           let t = AppTab.allCases.first(where: { "\($0)" == args[i + 1] }) {
+            tab = t
+        }
+        if let i = args.firstIndex(of: "-planning-week"), i + 1 < args.count {
+            planningWeek = args[i + 1]
+        }
         if args.contains("-open-settings") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = [SessionRoute(id: args[i + 1], source: "launch")]
@@ -180,10 +199,9 @@ private struct ComingSoon: View {
 
     private var text: String {
         switch tab {
-        case .planning: "Le planning de la semaine arrive : tu pourras préparer une séance pour toi, pour l’autre ou pour vous deux."
         case .load: "Le tableau de charge arrive : tes séances, tes heures et ta progression machine par machine."
         case .machines: "Le catalogue des machines arrive : photos, réglages du siège et corrections."
-        case .home: ""
+        case .home, .planning: ""
         }
     }
 
