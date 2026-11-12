@@ -1,0 +1,39 @@
+name: SuiviMuscu
+options:
+  bundleIdPrefix: fr.suivimuscu
+  deploymentTarget:
+    iOS: "18.0"
+  developmentLanguage: fr
+packages:
+  SuiviCore:
+    path: SuiviCore
+targets:
+  SuiviMuscu:
+    type: application
+    platform: iOS
+    sources:
+      - SuiviMuscu
+    dependencies:
+      - package: SuiviCore
+    # Heure et batterie en blanc sur le fond sombre de l'appli (les autres clés sont générées par Xcode).
+    info:
+      path: SuiviMuscu/Info.plist
+      properties:
+        UIViewControllerBasedStatusBarAppearance: false
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.suivimuscu.app
+        PRODUCT_NAME: SuiviMuscu
+        DEVELOPMENT_TEAM: 5YNLG6QS4W
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Suivi Muscu"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
