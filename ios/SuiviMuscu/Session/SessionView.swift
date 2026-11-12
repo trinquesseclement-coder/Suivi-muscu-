@@ -26,6 +26,10 @@ struct SessionView: View {
     @State private var celebrated: Set<String>?
     /// Incrémenté à chaque nouveau record : rejoue `RecordBurst` et la vibration forte.
     @State private var recordBurst = 0
+    @State private var rest = RestTimerModel()
+    @State private var picking = false
+    /// Durée du repos en secondes (le réglage arrive en tâche 10).
+    @AppStorage("rest.seconds") private var restSeconds = 90
 
     var body: some View {
         Group {
@@ -41,6 +45,7 @@ struct SessionView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            rest.stop()
             discardIfEmpty()
         }
     }
@@ -122,6 +127,9 @@ struct SessionView: View {
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if editable { bottomBar(s, progress: progress) }
+        }
+        .sheet(isPresented: $picking) {
+            ExercisePicker { exercises in addExercises(exercises) }
         }
         .sheet(isPresented: $finishing, onDismiss: {
             if finished { leaving = true; dismiss() }
@@ -265,13 +273,18 @@ struct SessionView: View {
 
     private func bottomBar(_ s: Session, progress: Bool) -> some View {
         HStack(spacing: 10) {
-            // Tâche 9 : le minuteur de repos (`RestTimer`) se place ici, à gauche de « Terminer ».
+            if rest.isActive {
+                RestTimer(model: rest)
+                    .transition(.opacity)
+            }
             Button {
                 if progress { finishing = true } else { dismiss() }
             } label: {
                 Text(progress ? (s.endedAt == nil ? "Terminer" : "Modifier le bilan") : "Fermer")
                     .font(Theme.font(.headline, weight: .semibold))
                     .foregroundStyle(progress ? Color.white : Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity, minHeight: 56)
                     .background(Capsule().fill(progress ? Theme.ink : Color.white.opacity(0.8)))
             }
@@ -283,6 +296,7 @@ struct SessionView: View {
         .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+        .motion(Motion.spring, value: rest.isActive)
     }
 
     private var notFound: some View {
@@ -300,13 +314,23 @@ struct SessionView: View {
         .padding(.top, 4)
     }
 
-    // MARK: Crochets de la tâche 9
+    // MARK: Repos et ajout d'exercices
 
-    /// Une série vient d'être validée : la tâche 9 y lance le minuteur de repos.
-    private func onSetValidated() {}
+    /// Une série vient d'être validée : le repos repart de zéro.
+    private func onSetValidated() { rest.start(seconds: restSeconds) }
 
-    /// « Ajouter un exercice » : la tâche 9 y ouvre `ExercisePicker`.
-    private func addExercise() {}
+    private func addExercise() { picking = true }
+
+    /// Chaque exercice choisi est préparé depuis l'historique du propriétaire et son schéma par défaut
+    /// (`Rules.newItem`), dans l'ordre de sélection, puis la séance est enregistrée une seule fois.
+    private func addExercises(_ exercises: [Exercise]) {
+        guard let s = store.session(sessionId), !exercises.isEmpty else { return }
+        let owner = store.profiles.first { $0.id == s.ownerId } ?? store.me
+        let scheme = Rules.defaultScheme(for: owner)
+        let history = store.sessions
+        let items = exercises.map { Rules.newItem($0, ownerId: s.ownerId, sessions: history, scheme: scheme) }
+        update { $0.items.append(contentsOf: items) }
+    }
 
     // MARK: Écriture
 

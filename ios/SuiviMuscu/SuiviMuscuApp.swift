@@ -1,9 +1,12 @@
 import SwiftUI
 import SuiviCore
+import UserNotifications
 
 @main
 struct SuiviMuscuApp: App {
     @State private var store: AppStore
+    /// Garde le délégué en vie (le centre de notifications ne le retient pas).
+    private static let notificationDelegate = NotificationDelegate()
 
     init() {
         // Vignettes des exercices gardées sur le téléphone, pour les revoir hors ligne.
@@ -20,6 +23,7 @@ struct SuiviMuscuApp: App {
         // Voir l'appli comme Jules tant que les Réglages n'existent pas (tâche 10).
         if args.contains("-as-jules") { store.switchProfile(to: AppStore.julesId) }
         #endif
+        UNUserNotificationCenter.current().delegate = Self.notificationDelegate
         _store = State(initialValue: store)
     }
 
