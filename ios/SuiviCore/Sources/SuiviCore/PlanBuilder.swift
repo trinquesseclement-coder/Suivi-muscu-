@@ -51,6 +51,36 @@ public enum PlanBuilder {
         }
     }
 
+    /// « Reprendre une séance » : les valeurs prévues de la séance si elle appartient déjà à
+    /// `owner`, sinon des specs tirées de l'historique de `owner` (`nil` = les deux), pour ne
+    /// jamais reprendre les charges de l'autre. Les exercices absents de `byId` sont ignorés.
+    public static func specs(copying s: Session, owner: Profile?, sessions: [Session],
+                             byId: [String: Exercise]) -> [PlanSpec] {
+        if let owner, owner.id == s.ownerId {
+            return specs(from: s).filter { byId[$0.exerciseId] != nil }
+        }
+        return s.items.compactMap { it in
+            byId[it.exerciseId].map { spec(for: $0, owner: owner, sessions: sessions) }
+        }
+    }
+
+    /// « Pour qui » a changé : chaque spec est refaite pour le nouveau propriétaire (son schéma,
+    /// ses charges), en gardant son identifiant et l'ordre.
+    public static func retarget(_ specs: [PlanSpec], owner: Profile?, sessions: [Session],
+                                byId: [String: Exercise]) -> [PlanSpec] {
+        specs.map { sp in
+            guard let ex = byId[sp.exerciseId] else { return sp }
+            var out = spec(for: ex, owner: owner, sessions: sessions)
+            out.id = sp.id
+            return out
+        }
+    }
+
+    /// Titre proposé tant que le champ « Nom » est vide.
+    public static func titleSuggestion(_ specs: [PlanSpec], byId: [String: Exercise]) -> String {
+        Rules.titleSuggestion(specs.map { SessionItem(id: $0.id, exerciseId: $0.exerciseId) }, byId: byId)
+    }
+
     // MARK: Items
 
     public static func items(from specs: [PlanSpec], owner: Profile, single: Bool,
@@ -102,7 +132,31 @@ public enum PlanBuilder {
         }
     }
 
+    /// Séance prévue modifiée : mêmes `id`, `groupId`, `createdBy`, toujours prévue ; les éléments
+    /// sont reconstruits pour `owner` seul. La séance sœur de l'autre n'est jamais touchée.
+    public static func edited(_ s: Session, specs: [PlanSpec], owner: Profile, date: String, title: String,
+                              notes: String?, sessions: [Session], byId: [String: Exercise],
+                              now: Date) -> Session {
+        let its = items(from: specs, owner: owner, single: true, sessions: sessions, byId: byId)
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var out = s
+        out.ownerId = owner.id
+        out.date = date
+        out.title = trimmedTitle.isEmpty ? Rules.titleSuggestion(its, byId: byId) : trimmedTitle
+        out.notes = (trimmedNotes?.isEmpty ?? true) ? nil : trimmedNotes
+        out.items = its
+        out.status = .planned
+        out.updatedAt = AppStore.timestamp(now)
+        return out
+    }
+
     // MARK: Aide
+
+    /// Au moins deux exercices avec aide, séparés par d'autres : la bannière propose de les regrouper.
+    public static func helpIsScattered(_ specs: [PlanSpec], byId: [String: Exercise]) -> Bool {
+        groupingHelp(specs, byId: byId).map(\.id) != specs.map(\.id)
+    }
 
     /// Regroupe les exercices avec aide là où apparaît le premier.
     public static func groupingHelp(_ specs: [PlanSpec], byId: [String: Exercise]) -> [PlanSpec] {

@@ -4,6 +4,9 @@ import SuiviCore
 /// Choix des exercices à ajouter à la séance (reprend `ExercisePicker` et `ExerciseFilters` du web).
 /// La sélection est multiple ; « Ajouter (n) » renvoie les exercices dans l'ordre où on les a choisis.
 struct ExercisePicker: View {
+    /// La personne pour qui on choisit (`nil` = moi) : le filtre et l'étiquette « Aide » ne
+    /// s'affichent que si elle a besoin d'aide.
+    var owner: Profile? = nil
     let onAdd: ([Exercise]) -> Void
 
     @Environment(AppStore.self) private var store
@@ -21,6 +24,8 @@ struct ExercisePicker: View {
 
     private var posture: Posture? { Posture(rawValue: postureRaw) }
 
+    private var helpMatters: Bool { Rules.profileNeedsHelp(owner ?? store.me) }
+
     private var list: [Exercise] {
         let q = Self.norm(query.trimmingCharacters(in: .whitespacesAndNewlines))
         return store.exercises.filter { e in
@@ -28,8 +33,8 @@ struct ExercisePicker: View {
                 return false
             }
             if let posture, e.posture != posture { return false }
-            if help == .with && !e.help { return false }
-            if help == .without && e.help { return false }
+            if helpMatters && help == .with && !e.help { return false }
+            if helpMatters && help == .without && e.help { return false }
             if let muscle, e.muscle != muscle { return false }
             return true
         }
@@ -131,10 +136,12 @@ struct ExercisePicker: View {
                 postureChip("Depuis le fauteuil", .fauteuil, icon: .wheelchair)
                 postureChip("Transfert", .transfert, icon: nil)
                 postureChip("Debout", .debout, icon: nil)
-                Capsule().fill(Theme.ink.opacity(0.12)).frame(width: 1.5, height: 22)
-                    .accessibilityHidden(true)
-                chip("Avec aide", on: help == .with, icon: .help) { help = help == .with ? .all : .with }
-                chip("Sans aide", on: help == .without, icon: nil) { help = help == .without ? .all : .without }
+                if helpMatters {
+                    Capsule().fill(Theme.ink.opacity(0.12)).frame(width: 1.5, height: 22)
+                        .accessibilityHidden(true)
+                    chip("Avec aide", on: help == .with, icon: .help) { help = help == .with ? .all : .with }
+                    chip("Sans aide", on: help == .without, icon: nil) { help = help == .without ? .all : .without }
+                }
             }
             chips {
                 chip("Tout", on: muscle == nil, icon: nil) { muscle = nil }
@@ -210,7 +217,7 @@ struct ExercisePicker: View {
                             .font(Theme.font(.footnote))
                             .foregroundStyle(Theme.ink2)
                             .lineLimit(1)
-                        if ex.help {
+                        if ex.help && helpMatters {
                             HStack(spacing: 3) {
                                 AppIcon.help.image.font(Theme.icon(11, weight: .semibold))
                                 Text("Aide")
@@ -233,7 +240,7 @@ struct ExercisePicker: View {
         .buttonStyle(.plain)
         .motion(Motion.spring, value: on)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(ex.name), \(Catalogue.muscleLabel(ex.muscle)), \(Self.postureText(ex.posture))\(ex.help ? ", avec aide" : "")")
+        .accessibilityLabel("\(ex.name), \(Catalogue.muscleLabel(ex.muscle)), \(Self.postureText(ex.posture))\(ex.help && helpMatters ? ", avec aide" : "")")
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
     }
 

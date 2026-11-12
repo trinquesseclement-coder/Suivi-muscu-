@@ -10,6 +10,8 @@ struct SessionView: View {
     var fresh = false
     /// Ouvre une autre séance à la place de celle-ci (après « Copier dans mes séances »).
     var onReplace: (String) -> Void = { _ in }
+    /// Ouvre l'éditeur de séance planifiée (séance prévue que j'ai créée, pas encore commencée).
+    var onEditPlan: (String) -> Void = { _ in }
 
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -220,6 +222,11 @@ struct SessionView: View {
 
     private func optionsMenu(_ s: Session, editable: Bool) -> some View {
         Menu {
+            if Rules.isEditablePlan(s, meId: store.meId) {
+                Button { onEditPlan(s.id) } label: {
+                    Label { Text("Modifier la séance") } icon: { AppIcon.planning.image }
+                }
+            }
             if editable {
                 Button {
                     newTitle = s.title

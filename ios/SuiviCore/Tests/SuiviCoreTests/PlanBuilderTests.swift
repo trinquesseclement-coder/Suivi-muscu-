@@ -99,4 +99,80 @@ import Testing
         let out = PlanBuilder.groupingHelp([a, h1, b, h2], byId: Self.byId)
         #expect(out.map(\.id) == [a.id, h1.id, h2.id, b.id])
     }
+    // MARK: Éditeur (tâche 5)
+
+    @Test func copyingOwnSessionKeepsPlannedValues() {
+        let s = done("sc", owner: Self.clement.id, scheme: .classic, sets: [(40, 8), (45, 8), (50, 6)])
+        let specs = PlanBuilder.specs(copying: s, owner: Self.clement, sessions: [s], byId: Self.byId)
+        #expect(specs.count == 1)
+        #expect(specs[0].scheme == .classic && specs[0].sets == 3 && specs[0].reps == 8 && specs[0].kg == 50)
+    }
+
+    @Test func copyingPartnerSessionNeverTakesTheirLoads() {
+        let mine = done("sc", owner: Self.clement.id, scheme: .pyramid, sets: [(20, 12), (25, 10), (30, 8), (20, 12)])
+        let his = done("sj", owner: Self.jules.id, scheme: .classic, sets: [(60, 10), (60, 10), (60, 10)])
+        let forMe = PlanBuilder.specs(copying: his, owner: Self.clement, sessions: [mine, his], byId: Self.byId)
+        #expect(forMe.count == 1)
+        #expect(forMe[0].scheme == .pyramid)
+        #expect(forMe[0].kg == 30)
+        let forBoth = PlanBuilder.specs(copying: his, owner: nil, sessions: [mine, his], byId: Self.byId)
+        #expect(forBoth[0].scheme == nil && forBoth[0].kg == 0)
+    }
+
+    @Test func copyingSkipsUnknownExercises() {
+        var s = done("sc", owner: Self.clement.id, scheme: .classic, sets: [(40, 8)])
+        s.items.append(SessionItem(id: "x", exerciseId: "machine-masquee", sets: [SetEntry(kg: 10, reps: 10, done: true)]))
+        #expect(PlanBuilder.specs(copying: s, owner: Self.clement, sessions: [], byId: Self.byId).count == 1)
+        #expect(PlanBuilder.specs(copying: s, owner: Self.jules, sessions: [], byId: Self.byId).count == 1)
+    }
+
+    @Test func retargetKeepsIdsAndUsesNewOwnerLoads() {
+        let his = done("sj", owner: Self.jules.id, scheme: .classic, sets: [(60, 10), (60, 10), (60, 10)])
+        let start = PlanSpec(id: "keep", exerciseId: "m-chest-press", scheme: .pyramid, sets: 4, reps: 12, kg: 30, minutes: 0)
+        let out = PlanBuilder.retarget([start], owner: Self.jules, sessions: [his], byId: Self.byId)
+        #expect(out.map(\.id) == ["keep"])
+        #expect(out[0].scheme == .classic && out[0].kg == 60 && out[0].sets == 3)
+        let both = PlanBuilder.retarget([start], owner: nil, sessions: [his], byId: Self.byId)
+        #expect(both[0].id == "keep" && both[0].scheme == nil && both[0].kg == 0)
+    }
+
+    @Test func editedSessionKeepsIdentity() {
+        let a = SessionItem(id: "a", exerciseId: "m-chest-press", sets: [SetEntry(kg: 40, reps: 10, done: false)], scheme: .classic)
+        let b = SessionItem(id: "b", exerciseId: "d-presse-45", sets: [SetEntry(kg: 50, reps: 10, done: false)], scheme: .classic)
+        let s = Session(id: "s1", ownerId: Self.clement.id, createdBy: Self.clement.id, date: "2026-11-14",
+                        title: "Full body", status: .planned, items: [a, b], groupId: "g1",
+                        updatedAt: "2026-11-01T10:00:00.000Z")
+        let specs = Array(PlanBuilder.specs(from: s).prefix(1))
+        let out = PlanBuilder.edited(s, specs: specs, owner: Self.clement, date: "2026-11-15", title: "",
+                                     notes: "  tôt  ", sessions: [], byId: Self.byId, now: Self.now)
+        #expect(out.id == "s1" && out.groupId == "g1" && out.createdBy == Self.clement.id)
+        #expect(out.ownerId == Self.clement.id && out.status == .planned)
+        #expect(out.date == "2026-11-15" && out.notes == "tôt" && out.title == "Push")
+        #expect(out.items.count == 1 && out.items[0].sets.allSatisfy { $0.kg == 40 && $0.reps == 10 })
+        #expect(out.updatedAt == AppStore.timestamp(Self.now))
+    }
+
+    @Test func editedSessionCanChangeOwner() {
+        let his = done("sj", owner: Self.jules.id, scheme: .classic, sets: [(60, 10), (60, 10), (60, 10)])
+        let s = Session(id: "s1", ownerId: Self.clement.id, createdBy: Self.clement.id, date: "2026-11-14",
+                        title: "Push", status: .planned, items: [], updatedAt: "2026-11-01T10:00:00.000Z")
+        let specs = PlanBuilder.retarget([spec("m-chest-press", scheme: .pyramid)], owner: Self.jules,
+                                         sessions: [his], byId: Self.byId)
+        let out = PlanBuilder.edited(s, specs: specs, owner: Self.jules, date: s.date, title: "Push",
+                                     notes: nil, sessions: [his], byId: Self.byId, now: Self.now)
+        #expect(out.id == "s1" && out.ownerId == Self.jules.id && out.createdBy == Self.clement.id)
+        #expect(out.items[0].sets.allSatisfy { $0.kg == 60 })
+    }
+
+    @Test func titleSuggestionFromSpecs() {
+        #expect(PlanBuilder.titleSuggestion([spec("m-chest-press"), spec("m-pec-deck")], byId: Self.byId) == "Push")
+        #expect(PlanBuilder.titleSuggestion([], byId: Self.byId) == "Séance")
+    }
+
+    @Test func helpScatteredOnlyWhenHelpIsSplit() {
+        let a = spec("m-chest-press"), h1 = spec("d-presse-45"), b = spec("m-pec-deck"), h2 = spec("d-chest-press")
+        #expect(PlanBuilder.helpIsScattered([a, h1, b, h2], byId: Self.byId))
+        #expect(!PlanBuilder.helpIsScattered([a, h1, h2, b], byId: Self.byId))
+        #expect(!PlanBuilder.helpIsScattered([a, h1, b], byId: Self.byId))
+    }
 }

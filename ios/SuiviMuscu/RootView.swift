@@ -28,7 +28,7 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab: AppTab = .home
     @State private var bounce = 0
-    @State private var path: [SessionRoute] = []
+    @State private var path = NavigationPath()
     /// Une date de la semaine affichée par le Planning (aujourd'hui au départ).
     @State private var planningWeek = Dates.isoDate(Date())
     @Namespace private var zoom
@@ -45,11 +45,12 @@ struct RootView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showSettings) { SettingsView() }
             .navigationDestination(for: SessionRoute.self) { route in
-                SessionView(sessionId: route.id, fresh: route.fresh) { id in
-                    path = [SessionRoute(id: id, source: route.source)]
-                }
+                SessionView(sessionId: route.id, fresh: route.fresh,
+                            onReplace: { id in path = NavigationPath([SessionRoute(id: id, source: route.source)]) },
+                            onEditPlan: { id in path.append(PlanRoute(sessionId: id)) })
                 .navigationTransition(.zoom(sourceID: route.source, in: zoom))
             }
+            .navigationDestination(for: PlanRoute.self, destination: planDestination)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -81,14 +82,24 @@ struct RootView: View {
         case .planning:
             PlanningView(week: $planningWeek, zoom: zoom,
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
-                         onPlan: { _ in
-                             // Tâche 5 : ouvre l'éditeur
-                         },
-                         onEditPlan: { _ in
-                             // Tâche 5 : ouvre l'éditeur
-                         })
+                         onPlan: { date in path.append(PlanRoute(date: date)) },
+                         onEditPlan: { id in path.append(PlanRoute(sessionId: id)) })
         case .load, .machines:
             ComingSoon(tab: tab)
+        }
+    }
+
+    /// Une séance qui n'est plus modifiable (commencée entre-temps) s'ouvre normalement.
+    @ViewBuilder private func planDestination(_ route: PlanRoute) -> some View {
+        if let id = route.sessionId, let s = store.session(id), !Rules.isEditablePlan(s, meId: store.meId) {
+            SessionView(sessionId: id)
+        } else {
+            PlanEditorView(sessionId: route.sessionId, date: route.date) { date in
+                // Retour au Planning, sur la semaine de la date choisie, d'où qu'on vienne.
+                planningWeek = date
+                tab = .planning
+                path = NavigationPath()
+            }
         }
     }
 
@@ -108,7 +119,8 @@ struct RootView: View {
     }
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
-    /// `-open-session <id>` ouvre une séance précise, `-open-tab planning` choisit l'onglet
+    /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -123,10 +135,14 @@ struct RootView: View {
         }
         if args.contains("-open-settings") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
-            path = [SessionRoute(id: args[i + 1], source: "launch")]
+            path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
         } else if args.contains("-open-next"),
                   let s = HomeView.nextSession(store.sessions, meId: store.meId, now: Date()) {
-            path = [SessionRoute(id: s.id, source: "next")]
+            path = NavigationPath([SessionRoute(id: s.id, source: "next")])
+        } else if let i = args.firstIndex(of: "-open-plan"), i + 1 < args.count {
+            path.append(PlanRoute(date: args[i + 1]))
+        } else if let i = args.firstIndex(of: "-open-plan-session"), i + 1 < args.count {
+            path.append(PlanRoute(sessionId: args[i + 1]))
         }
         #endif
     }

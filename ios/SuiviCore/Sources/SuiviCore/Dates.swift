@@ -13,7 +13,7 @@ public enum Dates {
         return String(format: "%04d-%02d-%02d", p.year!, p.month!, p.day!)
     }
 
-    static func parse(_ iso: String) -> Date? {
+    public static func parse(_ iso: String) -> Date? {
         let parts = iso.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 12))
