@@ -41,7 +41,14 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: SettingsRoute.self) { SettingsView(focus: $0.focus) }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                SettingsView(focus: route.focus)
+                    .environment(\.openCycleTemplate, OpenCycleTemplateAction { id in
+                        // Depuis les Réglages seulement (une seule fois, même sur un double appui).
+                        guard path.count == 1 else { return }
+                        path.append(CycleRoute(templateId: id))
+                    })
+            }
             .navigationDestination(for: SessionRoute.self) { route in
                 SessionView(sessionId: route.id, fresh: route.fresh,
                             onReplace: { id in path = NavigationPath([SessionRoute(id: id, source: route.source)]) },
@@ -104,7 +111,10 @@ struct RootView: View {
         }
     }
 
+    /// Les Réglages s'ouvrent depuis l'accueil seulement : un double appui sur la photo (ou un appui
+    /// pendant l'animation) n'empile pas un second écran.
     private func openSettings(focus: SettingsFocus? = nil) {
+        guard path.isEmpty else { return }
         path.append(SettingsRoute(focus: focus))
     }
 

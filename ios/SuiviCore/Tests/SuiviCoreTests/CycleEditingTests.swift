@@ -51,7 +51,7 @@ import Testing
 
     @Test func addingSkipsExercisesAlreadyThere() {
         var cardio = Cycle.standard.templates[2]
-        cardio.add([CycleItem(exerciseId: "c-tapis", minutes: 15),
+        cardio.add([CycleItem(exerciseId: "c-tapis", minutes: 30),
                     CycleItem(exerciseId: "c-velo", minutes: 15),
                     CycleItem(exerciseId: "c-velo", minutes: 15),
                     CycleItem(exerciseId: "m-curl")])

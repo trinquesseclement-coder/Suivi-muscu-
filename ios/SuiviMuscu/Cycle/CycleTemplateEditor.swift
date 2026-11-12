@@ -15,6 +15,8 @@ struct CycleTemplateEditor: View {
 
     @State private var draft = CycleTemplate(id: "", title: "", items: [])
     @State private var loaded = false
+    /// Séance type introuvable : l'écran se referme, sans jamais en créer une nouvelle.
+    @State private var missing = false
     @State private var picking = false
     @FocusState private var nameFocused: Bool
 
@@ -27,6 +29,18 @@ struct CycleTemplateEditor: View {
     private var canSave: Bool { !trimmedTitle.isEmpty && !draft.items.isEmpty }
 
     var body: some View {
+        Group {
+            if loaded && !missing {
+                editor
+            } else {
+                Theme.background.ignoresSafeArea()
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear(perform: load)
+    }
+
+    private var editor: some View {
         let byId = store.exerciseById
         let anyById = store.exerciseAnyById
         return ScrollView {
@@ -85,7 +99,6 @@ struct CycleTemplateEditor: View {
             // Le cycle est commun : l'étiquette « Aide » suit celui des deux qui en a besoin.
             ExercisePicker(owner: store.profiles.first(where: Rules.profileNeedsHelp) ?? store.me) { add($0) }
         }
-        .onAppear(perform: load)
     }
 
     // MARK: En-tête et champs
@@ -155,7 +168,7 @@ struct CycleTemplateEditor: View {
                         .font(Theme.font(.body, weight: .semibold))
                         .foregroundStyle(hidden ? Theme.ink2 : Theme.ink)
                         .lineLimit(2)
-                    if hidden {
+                    if hidden && exercise != nil {
                         Text("Machine masquée")
                             .font(Theme.font(.footnote))
                             .foregroundStyle(Theme.ink2)
@@ -258,11 +271,16 @@ struct CycleTemplateEditor: View {
     private func load() {
         guard !loaded else { return }
         loaded = true
-        if let templateId, let t = store.cycle.templates.first(where: { $0.id == templateId }) {
-            draft = t
-        } else {
+        guard let templateId else {
             draft = CycleTemplate(id: Cycle.newTemplateId(), title: "", items: [])
+            return
         }
+        guard let t = store.cycle.templates.first(where: { $0.id == templateId }) else {
+            missing = true
+            dismiss()
+            return
+        }
+        draft = t
     }
 
     private func minutes(at i: Int) -> Binding<Double> {
@@ -288,6 +306,11 @@ struct CycleTemplateEditor: View {
 
     private func save() {
         guard canSave else { return }
+        // Séance type supprimée pendant la modification : on ne la recrée pas.
+        if !isNew && !store.cycle.templates.contains(where: { $0.id == draft.id }) {
+            dismiss()
+            return
+        }
         var t = draft
         t.title = trimmedTitle
         var cycle = store.cycle

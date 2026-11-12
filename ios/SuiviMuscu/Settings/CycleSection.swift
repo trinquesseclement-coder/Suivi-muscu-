@@ -8,6 +8,7 @@ struct CycleSection: View {
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.openCycleTemplate) private var openTemplate
     /// Pastille du rang : grandit avec le texte (jusqu'au très grand texte, où elle disparaît).
     @ScaledMetric(relativeTo: .subheadline) private var rankSize: CGFloat = 32
 
@@ -64,7 +65,7 @@ struct CycleSection: View {
         // (la ligne reste un bouton).
         let compact = typeSize.isAccessibilitySize
         return HStack(spacing: 0) {
-            NavigationLink(value: CycleRoute(templateId: t.id)) {
+            Button { openTemplate(t.id) } label: {
                 HStack(spacing: 12) {
                     if !compact {
                         Text("\(rank)")
@@ -75,7 +76,7 @@ struct CycleSection: View {
                             .background(Circle().fill(Theme.ink.opacity(0.08)))
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(compact ? "\(rank). \(t.title)" : t.title)
+                        Text(compact ? "\(rank). \(Self.keepTogether(t.title))" : Self.keepTogether(t.title))
                             .font(Theme.font(.body, weight: .semibold))
                             .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.leading)
@@ -92,7 +93,7 @@ struct CycleSection: View {
                             .foregroundStyle(Theme.ink2)
                     }
                 }
-                .padding(.leading, compact ? 14 : 12)
+                .padding(.leading, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
                 .contentShape(Rectangle())
@@ -135,12 +136,13 @@ struct CycleSection: View {
                 .frame(width: Theme.minTouch, height: Theme.minTouch)
                 .contentShape(Rectangle())
         }
-        .padding(.trailing, 4)
+        // Les points du « … » à 14 pt du bord droit, comme la pastille du rang à gauche.
+        .padding(.trailing, -1)
         .accessibilityLabel("Options de \(t.title)")
     }
 
     private var addButton: some View {
-        NavigationLink(value: CycleRoute(templateId: nil)) {
+        Button { openTemplate(nil) } label: {
             HStack(spacing: 12) {
                 AppIcon.add.image
                     .font(Theme.icon(17, weight: .semibold))
@@ -203,9 +205,10 @@ struct CycleSection: View {
 
     // MARK: Textes
 
-    /// « Pecs + bras » ne se coupe pas après le « + » dans les bulles de confirmation.
+    /// « Pecs + bras » : le « + » reste collé au mot d'avant, une ligne ne commence jamais par lui
+    /// (lignes du cycle, bulles de confirmation). La coupure reste possible après lui.
     static func keepTogether(_ text: String) -> String {
-        text.replacingOccurrences(of: " + ", with: "\u{00A0}+\u{00A0}")
+        text.replacingOccurrences(of: " + ", with: "\u{00A0}+ ")
     }
 
     /// Exercices disponibles (machines visibles), comme la carte de l'accueil.
