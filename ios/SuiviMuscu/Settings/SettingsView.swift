@@ -54,11 +54,8 @@ struct SettingsView: View {
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Sur ce téléphone, je suis").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-                Picker("Profil actif", selection: Binding(get: { store.meId }, set: { store.switchProfile(to: $0) })) {
-                    ForEach(store.profiles) { Text($0.name).tag($0.id) }
-                }
-                .pickerStyle(.segmented)
-                .frame(minHeight: Theme.minTouch)
+                SettingsSegmented(options: store.profiles.map { ($0.id, $0.name) }, selection: store.meId,
+                                  label: "Profil actif") { store.switchProfile(to: $0) }
             }
             ForEach(store.profiles) { p in
                 Divider()
@@ -74,10 +71,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Séance").font(Theme.font(.title3, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            SwiftUI.Stepper(value: $restSeconds, in: 30...180, step: 15) {
-                Text("Temps de repos par défaut : \(restSeconds) s").font(Theme.font(.body))
-            }
-            .frame(minHeight: Theme.minTouch)
+            SettingsStepper(title: "Temps de repos par défaut", valueText: "\(restSeconds) s",
+                            value: $restSeconds, range: 30...180, step: 15)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,6 +121,7 @@ private struct ProfileEditor: View {
     /// Toujours la dernière version du profil (le store est la source de vérité).
     private var current: Profile { store.profiles.first { $0.id == profile.id } ?? profile }
     private var tint: Color { Theme.color(for: current) }
+    private var goal: Int { current.settings?.weeklyGoal ?? 3 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -149,27 +145,22 @@ private struct ProfileEditor: View {
                 .tint(tint)
                 .frame(minHeight: Theme.minTouch)
 
-            SwiftUI.Stepper(value: Binding(
-                get: { current.settings?.weeklyGoal ?? 3 },
+            SettingsStepper(title: "Objectif par semaine", valueText: "\(goal) séance\(goal > 1 ? "s" : "")",
+                            value: Binding(
+                get: { goal },
                 set: { v in var p = current; var s = p.settings ?? ProfileSettings(); s.weeklyGoal = v
-                    p.settings = s; store.saveProfile(p) }), in: 1...7) {
-                Text("Objectif : \(current.settings?.weeklyGoal ?? 3) séance\((current.settings?.weeklyGoal ?? 3) > 1 ? "s" : "") par semaine")
-            }
-            .frame(minHeight: Theme.minTouch)
+                    p.settings = s; store.saveProfile(p) }), range: 1...7, step: 1)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Schéma par défaut").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-                Picker("Schéma par défaut", selection: Binding(
-                    get: { Rules.defaultScheme(for: current) },
-                    set: { v in var p = current; var s = p.settings ?? ProfileSettings(); s.defaultScheme = v
-                        p.settings = s; store.saveProfile(p) })) {
-                    Text("Pyramide 12/10/8/12").tag(RepScheme.pyramid)
-                    Text("Classique").tag(RepScheme.classic)
+                SettingsSegmented(options: [(RepScheme.pyramid, "Pyramide 12/10/8/12"), (RepScheme.classic, "Classique")],
+                                  selection: Rules.defaultScheme(for: current), label: "Schéma par défaut") { v in
+                    var p = current; var s = p.settings ?? ProfileSettings(); s.defaultScheme = v
+                    p.settings = s; store.saveProfile(p)
                 }
-                .pickerStyle(.segmented)
-                .frame(minHeight: Theme.minTouch)
             }
         }
+        .onDisappear(perform: commitName)
     }
 
     private func commitName() {
@@ -177,5 +168,88 @@ private struct ProfileEditor: View {
         guard !trimmed.isEmpty else { name = current.name; return }
         guard trimmed != current.name else { return }
         var p = current; p.name = trimmed; store.saveProfile(p)
+    }
+}
+
+/// « − valeur + » à boutons de 48 pt (le Stepper système n'en fait que 32).
+private struct SettingsStepper: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let step: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
+                Text(valueText).font(Theme.font(.body, weight: .semibold)).monospacedDigit()
+            }
+            Spacer(minLength: 8)
+            button(.minus, delta: -step, label: "moins")
+            button(.add, delta: step, label: "plus")
+        }
+        .frame(minHeight: Theme.minTouch)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(valueText)
+        .accessibilityAdjustableAction { d in
+            switch d {
+            case .increment: set(value + step)
+            case .decrement: set(value - step)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func set(_ v: Int) { value = min(range.upperBound, max(range.lowerBound, v)) }
+
+    private func button(_ icon: AppIcon, delta: Int, label: String) -> some View {
+        let next = value + delta
+        let enabled = range.contains(next)
+        return Button { set(next) } label: {
+            icon.image.font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: Theme.minTouch, height: Theme.minTouch)
+                .background(Circle().fill(Color.white.opacity(0.62)))
+                .opacity(enabled ? 1 : 0.3)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+}
+
+/// Sélecteur segmenté à segments de 48 pt de haut.
+private struct SettingsSegmented<T: Hashable>: View {
+    let options: [(T, String)]
+    let selection: T
+    let label: String
+    let onSelect: (T) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(options.indices, id: \.self) { i in
+                let (value, title) = options[i]
+                let active = value == selection
+                Button { if !active { onSelect(value) } } label: {
+                    Text(title)
+                        .font(Theme.font(.subheadline, weight: .semibold))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .foregroundStyle(active ? Color.white : Theme.ink)
+                        .frame(maxWidth: .infinity, minHeight: Theme.minTouch - 6)
+                        .background(Capsule().fill(active ? Theme.ink : Color.clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+                .accessibilityAddTraits(active ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .frame(minHeight: Theme.minTouch)
+        .background(Capsule().fill(Theme.ink.opacity(0.07)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(label)
     }
 }
