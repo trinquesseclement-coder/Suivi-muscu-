@@ -114,7 +114,7 @@ struct StoreTests {
         let found = try backups(of: url)
         #expect(found.count == 2)
         #expect(try Data(contentsOf: older) == Data("ancienne copie".utf8))
-        let fresh = try #require(found.first { $0 != older })
+        let fresh = try #require(found.first { $0.lastPathComponent != older.lastPathComponent })
         #expect(try Data(contentsOf: fresh) == Data("pas du json {".utf8))
         // Après une copie réussie, on peut écrire normalement.
         store.saveSession(makeSession())
