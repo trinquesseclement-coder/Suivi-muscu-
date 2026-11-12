@@ -50,4 +50,13 @@ import Testing
         #expect(Stats.sessionCardioMinutes(s, byId: byId) == 15)
         #expect(Stats.startedItemCount(s) == 2)
     }
+
+    @Test func dayMonthAndLoad() {
+        #expect(Format.dayMonth("2026-11-06") == "6 nov.")
+        #expect(Format.dayMonth("2026-05-13") == "13 mai")
+        #expect(Format.load(21.25) == "21,25")
+        #expect(Format.load(27.5) == "27,5")
+        #expect(Format.load(40) == "40")
+        #expect(Format.load(0.1 + 0.2) == "0,3")
+    }
 }

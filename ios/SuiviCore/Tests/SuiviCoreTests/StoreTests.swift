@@ -131,4 +131,13 @@ struct StoreTests {
         #expect(store.me.needsHelp == true)
         #expect(store.exerciseById["m-chest-press"]?.note == "Siège cran 4, dossier cran 2")
     }
+
+    @Test func sessionLookupHidesDeleted() {
+        let store = AppStore(fileURL: tempFile())
+        store.saveSession(makeSession())
+        #expect(store.session("s1")?.title == "Test")
+        store.deleteSession(id: "s1")
+        #expect(store.session("s1") == nil)
+        #expect(store.session("absent") == nil)
+    }
 }

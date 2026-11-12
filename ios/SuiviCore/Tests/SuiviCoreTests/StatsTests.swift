@@ -124,4 +124,17 @@ import Testing
         #expect(Stats.sessionPRs([before, same], same).isEmpty)
         #expect(Stats.sessionPRs([better], better).isEmpty)
     }
+
+    @Test func previousBestsAndRecordFlag() {
+        let before = session("a", date: "2026-11-05", items: [
+            SessionItem(id: "i", exerciseId: "m-chest-press", sets: [SetEntry(kg: 40, reps: 10, done: true)])])
+        let now = session("b", date: "2026-11-12", items: [
+            SessionItem(id: "j", exerciseId: "m-chest-press", sets: [SetEntry(kg: 45, reps: 10, done: true)])])
+        let best = Stats.previousBests([before, now], now)["m-chest-press"] ?? 0
+        #expect(abs(best - Stats.e1rm(kg: 40, reps: 10)) < 0.001)
+        #expect(Stats.isRecord(SetEntry(kg: 45, reps: 10, done: true), best: best))
+        #expect(!Stats.isRecord(SetEntry(kg: 45, reps: 10, done: false), best: best))
+        #expect(!Stats.isRecord(SetEntry(kg: 40, reps: 10, done: true), best: best))
+        #expect(!Stats.isRecord(SetEntry(kg: 45, reps: 10, done: true), best: 0))
+    }
 }

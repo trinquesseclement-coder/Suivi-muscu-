@@ -45,6 +45,21 @@ public enum Format {
         return String(format: "%.1f", r).replacingOccurrences(of: ".", with: ",")
     }
 
+    /// Jour et mois abrégé, comme `fmtDM` du web : « 6 nov. », « 13 mai ».
+    public static func dayMonth(_ iso: String) -> String {
+        guard let p = parts(iso) else { return iso }
+        return "\(p.day) \(monthsShort[p.month - 1])"
+    }
+
+    /// Charge saisie, deux décimales au plus (pas de 1,25 kg) : 21.25 → « 21,25 », 40 → « 40 ».
+    public static func load(_ n: Double) -> String {
+        let r = (n * 100).rounded() / 100
+        if r == r.rounded() { return String(Int(r)) }
+        var text = String(format: "%.2f", r)
+        while text.hasSuffix("0") { text.removeLast() }
+        return text.replacingOccurrences(of: ".", with: ",")
+    }
+
     /// 5 400 kg → « 5,4 t » ; 850 → « 850 kg ».
     public static func tonnage(_ kg: Double) -> String {
         if kg >= 1000 { return "\(number(kg / 1000)) t" }

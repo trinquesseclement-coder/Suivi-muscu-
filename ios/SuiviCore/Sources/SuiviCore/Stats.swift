@@ -59,6 +59,17 @@ public enum Stats {
 
     /// Exercices dont le record (1RM estimé) est battu pendant cette séance.
     public static func sessionPRs(_ all: [Session], _ s: Session) -> [String] {
+        let previous = previousBests(all, s)
+        var out: [String] = []
+        for it in s.items {
+            let best = doneSets(it).map { e1rm(kg: $0.kg, reps: $0.reps) }.max() ?? 0
+            if best > 0, let p = previous[it.exerciseId], best > p + 0.01 { out.append(it.exerciseId) }
+        }
+        return out
+    }
+
+    /// Meilleur 1RM estimé par exercice avant cette séance (mêmes séances que `sessionPRs`).
+    public static func previousBests(_ all: [Session], _ s: Session) -> [String: Double] {
         var previous: [String: Double] = [:]
         for o in all where o.ownerId == s.ownerId && o.id != s.id && o.status == .done && o.date <= s.date {
             for it in o.items {
@@ -67,12 +78,12 @@ public enum Stats {
                 }
             }
         }
-        var out: [String] = []
-        for it in s.items {
-            let best = doneSets(it).map { e1rm(kg: $0.kg, reps: $0.reps) }.max() ?? 0
-            if best > 0, let p = previous[it.exerciseId], best > p + 0.01 { out.append(it.exerciseId) }
-        }
-        return out
+        return previous
+    }
+
+    /// Cette série bat-elle le record d'avant la séance (`best`, 0 si aucun) ?
+    public static func isRecord(_ set: SetEntry, best: Double) -> Bool {
+        set.done && set.reps > 0 && best > 0 && e1rm(kg: set.kg, reps: set.reps) > best + 0.01
     }
 
     // MARK: Semaine

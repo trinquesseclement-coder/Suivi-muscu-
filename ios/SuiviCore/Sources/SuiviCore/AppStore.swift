@@ -42,6 +42,12 @@ public final class AppStore {
             .sorted { $0.date != $1.date ? $0.date > $1.date : $0.updatedAt > $1.updatedAt }
     }
 
+    /// Une séance par son id, `nil` si elle n'existe pas ou a été supprimée.
+    public func session(_ id: String) -> Session? {
+        guard let s = sessionMap[id], s.deleted != true else { return nil }
+        return s
+    }
+
     /// Catalogue de base fusionné avec les corrections, trié par nom, sans les supprimés.
     public var exercises: [Exercise] {
         mergedExercises
@@ -134,7 +140,7 @@ public final class AppStore {
     // MARK: Fichier
 
     /// ISO 8601 avec millisecondes, en UTC (« 2026-11-12T17:30:00.000Z »), comme le web.
-    nonisolated static func timestamp(_ date: Date) -> String {
+    public nonisolated static func timestamp(_ date: Date) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f.string(from: date)
