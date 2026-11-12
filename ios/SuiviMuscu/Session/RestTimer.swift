@@ -1,4 +1,5 @@
 import SwiftUI
+import SuiviCore
 import AudioToolbox
 import UserNotifications
 
@@ -83,9 +84,13 @@ final class RestTimerModel {
 
     private func end() {
         finished = true
+        guard let endDate else { return }
+        let action = RestEnd.decide(now: Date(), endDate: endDate,
+                                    isActive: UIApplication.shared.applicationState == .active)
+        // En arrière-plan, la notification doit rester programmée pour partir.
+        if action.cancelNotification { Self.cancelNotification() }
+        guard action.signal else { return }
         finishCount += 1
-        // La notification n'est utile qu'en arrière-plan : au premier plan, vibration et son suffisent.
-        Self.cancelNotification()
         AudioServicesPlaySystemSound(1005)
         AccessibilityNotification.Announcement("Repos terminé, série suivante.").post()
     }
