@@ -56,7 +56,8 @@ struct SessionView: View {
 
     private func content(_ s: Session) -> some View {
         let editable = s.ownerId == store.meId
-        let byId = store.exerciseById
+        // Avec les machines masquées : une séance qui en contient les affiche toujours.
+        let byId = store.exerciseAnyById
         let all = store.sessions
         let bests = Stats.previousBests(all, s)
         let prs = Stats.sessionPRs(all, s)

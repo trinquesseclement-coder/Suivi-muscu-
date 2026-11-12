@@ -87,7 +87,7 @@ struct RootView: View {
         case .load:
             LoadView()
         case .machines:
-            ComingSoon(tab: tab)
+            MachinesView()
         }
     }
 
@@ -122,7 +122,7 @@ struct RootView: View {
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
     /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
-    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` (ou `load`) choisit l'onglet
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -208,41 +208,5 @@ struct RootView: View {
         .buttonStyle(PressableStyle())
         .zoomSource("add", in: zoom)
         .accessibilityLabel("Séance libre")
-    }
-}
-
-/// Onglet pas encore construit : dit ce qui arrive, plutôt qu'un écran muet.
-private struct ComingSoon: View {
-    let tab: AppTab
-
-    private var text: String {
-        switch tab {
-        case .machines: "Le catalogue des machines arrive : photos, réglages du siège et corrections."
-        case .home, .planning, .load: ""
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 12) {
-            tab.icon.image
-                .font(Theme.icon(22, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 56, height: 56)
-                .background(Circle().fill(Color.white.opacity(0.7)))
-            Text(tab.label).font(Theme.font(.title3, weight: .bold))
-            Text(text)
-                .font(Theme.font(.subheadline))
-                .foregroundStyle(Theme.ink2)
-                .multilineTextAlignment(.center)
-            Text("Bientôt")
-                .font(Theme.font(.caption, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(Capsule().fill(Theme.ink.opacity(0.08)))
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .glassCard()
-        .padding(.horizontal, 16)
-        .accessibilityElement(children: .combine)
     }
 }
