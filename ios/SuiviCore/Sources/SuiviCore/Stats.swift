@@ -39,6 +39,24 @@ public enum Stats {
         s.items.reduce(0) { $0 + itemTonnage($1) }
     }
 
+    /// Nombre de séries faites dans la séance.
+    public static func sessionSetCount(_ s: Session) -> Int {
+        s.items.reduce(0) { $0 + doneSets($1).count }
+    }
+
+    /// Minutes de cardio validées dans la séance.
+    public static func sessionCardioMinutes(_ s: Session, byId: [String: Exercise]) -> Int {
+        s.items.reduce(0) { total, it in
+            guard byId[it.exerciseId]?.kind == .cardio, let c = it.cardio, c.done else { return total }
+            return total + c.minutes
+        }
+    }
+
+    /// Exercices commencés (au moins une série ou le cardio validé), pour « 2/3 exercices ».
+    public static func startedItemCount(_ s: Session) -> Int {
+        s.items.filter { $0.sets.contains(where: \.done) || $0.cardio?.done == true }.count
+    }
+
     /// Exercices dont le record (1RM estimé) est battu pendant cette séance.
     public static func sessionPRs(_ all: [Session], _ s: Session) -> [String] {
         var previous: [String: Double] = [:]

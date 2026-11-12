@@ -3,7 +3,7 @@ import SwiftUI
 /// Toutes les icônes de l'appli passent par ici (images provisoires, remplacées au plan 3).
 enum AppIcon: String, CaseIterable {
     case home, planning, add, load, machines, settings, sessions, time, timer, trophy, goal
-    case together, wheelchair, transfer, standing, help, plate, cardio, sync, offline, photo, pyramid
+    case together, wheelchair, transfer, standing, help, plate, cardio, sync, offline, photo, pyramid, play
 
     var symbolName: String {
         switch self {
@@ -29,6 +29,7 @@ enum AppIcon: String, CaseIterable {
         case .offline: "wifi.slash"
         case .photo: "camera"
         case .pyramid: "triangle"
+        case .play: "play.fill"
         }
     }
 

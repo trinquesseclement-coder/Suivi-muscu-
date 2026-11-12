@@ -31,6 +31,10 @@ struct RootView: View {
 
     /// Appelé par le bouton « + » (séance libre), branché à la tâche 8.
     var onAdd: () -> Void = {}
+    /// Ouvre une séance par son id, branché à la tâche 8.
+    var onOpenSession: (String) -> Void = { _ in }
+    /// Ouvre les Réglages depuis l'avatar, branché à la tâche 10.
+    var onSettings: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -55,7 +59,7 @@ struct RootView: View {
     @ViewBuilder private var content: some View {
         switch tab {
         case .home:
-            Text("Accueil").font(Theme.font(.largeTitle, weight: .bold)).foregroundStyle(.white)
+            HomeView(onOpenSession: onOpenSession, onFreeSession: onAdd, onAvatar: onSettings)
         case .planning, .load, .machines:
             Text("Bientôt").font(Theme.font(.title2, weight: .semibold)).foregroundStyle(.white)
         }
