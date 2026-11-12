@@ -21,7 +21,7 @@ struct MachineEditor: View {
     }
 
     /// Machine du catalogue (« Masquer ») ou machine perso (« Supprimer »).
-    private var isBase: Bool { Catalogue.base.contains { $0.id == exercise.id } }
+    private var isBase: Bool { Catalogue.baseIds.contains(exercise.id) }
     private var canSave: Bool { !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {

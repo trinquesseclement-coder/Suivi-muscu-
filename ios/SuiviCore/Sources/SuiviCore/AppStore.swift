@@ -108,8 +108,7 @@ public final class AppStore {
     /// Catalogue de base avec les corrections, puis les machines perso utilisables.
     private var mergedExercises: [Exercise] {
         var result = Catalogue.base.map { overrides[$0.id]?.applied(to: $0) ?? $0 }
-        let baseIds = Set(Catalogue.base.map(\.id))
-        result += overrides.values.filter { !baseIds.contains($0.id) }.compactMap { $0.applied(to: nil) }
+        result += overrides.values.filter { !Catalogue.baseIds.contains($0.id) }.compactMap { $0.applied(to: nil) }
         return result
     }
 

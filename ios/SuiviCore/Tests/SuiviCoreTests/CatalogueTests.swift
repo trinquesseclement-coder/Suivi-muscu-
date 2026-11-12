@@ -11,6 +11,11 @@ import Testing
         #expect(Catalogue.base.filter { $0.kind == .cardio }.count == 11)
     }
 
+    @Test func baseIdsListEveryCatalogueMachineOnly() {
+        #expect(Catalogue.baseIds == Set(Catalogue.base.map(\.id)) && Catalogue.baseIds.count == 70
+                && !Catalogue.baseIds.contains("perso-1"))
+    }
+
     @Test func catalogueSpotChecks() throws {
         let chest = try exercise("m-chest-press")
         #expect(chest.posture == .transfert)

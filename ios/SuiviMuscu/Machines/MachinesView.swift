@@ -34,7 +34,7 @@ struct MachinesView: View {
         let helper = Rules.helperName(store.profiles)
         let list = filters.apply(all, helpMatters: helper != nil)
         let hidden = store.exerciseAnyById.values
-            .filter { $0.deleted == true && Self.baseIds.contains($0.id) }
+            .filter { $0.deleted == true && Catalogue.baseIds.contains($0.id) }
             .sorted { $0.name.compare($1.name, locale: Locale(identifier: "fr_FR")) == .orderedAscending }
 
         return ScrollView {
@@ -64,8 +64,6 @@ struct MachinesView: View {
         .navigationDestination(item: $editing) { MachineEditor(exercise: $0.exercise, isNew: $0.isNew) }
     }
 
-    private static let baseIds = Set(Catalogue.base.map(\.id))
-
     // MARK: En-tête
 
     private func header(count: Int) -> some View {
@@ -87,7 +85,8 @@ struct MachinesView: View {
                 .accessibilityLabel("Ajouter une machine")
             }
             // Sous le titre et le « + », sur toute la largeur : la ligne ne se coupe pas.
-            Text("KOMEX · \(count) exercices · touche pour corriger")
+            // Espaces insécables avant chaque « · » : une ligne ne commence jamais par un point.
+            Text("KOMEX\u{00A0}· \(count)\u{00A0}exercices\u{00A0}· touche pour corriger")
                 .font(Theme.font(.subheadline))
                 .opacity(0.8)
                 .fixedSize(horizontal: false, vertical: true)
@@ -116,7 +115,8 @@ struct MachinesView: View {
             .foregroundStyle(Theme.onBackground)
             .padding(.horizontal, 2)
 
-            VStack(spacing: 0) {
+            // Paresseux aussi à l'intérieur de la carte : seules les lignes visibles sont construites.
+            LazyVStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, ex in
                     if i > 0 { Divider().overlay(Theme.ink.opacity(0.08)).padding(.leading, 76) }
                     row(ex, helper: helper)

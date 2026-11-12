@@ -77,6 +77,9 @@ public enum Catalogue {
         Exercise(id: "c-elliptique", name: "Elliptique", kind: .cardio, muscle: .cardio, posture: .debout, help: false, equipment: .cardio, brand: .technogym),
     ]
 
+    /// Les ids du catalogue de base : une machine qui n'y est pas est une machine perso.
+    public static let baseIds: Set<String> = Set(base.map(\.id))
+
     public static func muscleLabel(_ m: Muscle) -> String {
         switch m {
         case .pecs: "Pectoraux"

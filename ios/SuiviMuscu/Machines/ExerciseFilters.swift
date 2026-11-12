@@ -64,31 +64,33 @@ struct ExerciseFilters: View {
     /// Suit le clavier de la recherche (le sélecteur cache son bouton du bas quand il est ouvert).
     var searching: FocusState<Bool>.Binding? = nil
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             search
                 .padding(.bottom, 4)
 
             // Posture et aide sur une seule rangée qui défile : la liste commence plus haut.
-            chips {
+            chips(selected: state.posture?.rawValue ?? (state.help == .all ? nil : "help-\(state.help.rawValue)")) {
                 postureChip("Depuis le fauteuil", .fauteuil, icon: .wheelchair)
                 postureChip("Transfert", .transfert, icon: nil)
                 postureChip("Debout", .debout, icon: nil)
                 if let helperName {
                     Capsule().fill(Theme.ink.opacity(0.12)).frame(width: 1.5, height: 22)
                         .accessibilityHidden(true)
-                    chip("Avec \(helperName)", on: state.help == .with, icon: .help) {
+                    chip("Avec \(helperName)", id: "help-with", on: state.help == .with, icon: .help) {
                         state.help = state.help == .with ? .all : .with
                     }
-                    chip("Sans aide", on: state.help == .without, icon: nil) {
+                    chip("Sans aide", id: "help-without", on: state.help == .without, icon: nil) {
                         state.help = state.help == .without ? .all : .without
                     }
                 }
             }
-            chips {
-                chip("Tout", on: state.muscle == nil, icon: nil) { state.muscle = nil }
+            chips(selected: state.muscle?.rawValue ?? "tout") {
+                chip("Tout", id: "tout", on: state.muscle == nil, icon: nil) { state.muscle = nil }
                 ForEach(Muscle.allCases, id: \.self) { m in
-                    chip(Catalogue.muscleLabel(m), on: state.muscle == m, icon: nil) { state.muscle = m }
+                    chip(Catalogue.muscleLabel(m), id: m.rawValue, on: state.muscle == m, icon: nil) { state.muscle = m }
                 }
             }
         }
@@ -127,20 +129,31 @@ struct ExerciseFilters: View {
         if let searching { text.focused(searching) } else { text }
     }
 
-    private func chips<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) { content() }
-                .padding(.horizontal, 16)
+    /// Rangée de puces qui défile ; la puce choisie est ramenée en vue à l'ouverture et quand elle
+    /// change (un filtre mémorisé, ou touché à moitié visible, ne reste jamais caché hors de l'écran).
+    private func chips<Content: View>(selected: String?, @ViewBuilder _ content: () -> Content) -> some View {
+        let row = content()
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) { row }
+                    .padding(.horizontal, 16)
+            }
+            .scrollIndicators(.hidden)
+            .onAppear { if let selected { proxy.scrollTo(selected, anchor: .center) } }
+            .onChange(of: selected) { _, new in
+                guard let new else { return }
+                withAnimation(reduceMotion ? Motion.reduced : Motion.spring) { proxy.scrollTo(new, anchor: .center) }
+            }
         }
-        .scrollIndicators(.hidden)
         .padding(.horizontal, -16)
     }
 
     private func postureChip(_ title: String, _ value: Posture, icon: AppIcon?) -> some View {
-        chip(title, on: state.posture == value, icon: icon) { state.posture = state.posture == value ? nil : value }
+        chip(title, id: value.rawValue, on: state.posture == value, icon: icon) { state.posture = state.posture == value ? nil : value }
     }
 
-    private func chip(_ title: String, on: Bool, icon: AppIcon?, action: @escaping () -> Void) -> some View {
+    private func chip(_ title: String, id: String, on: Bool, icon: AppIcon?,
+                      action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if let icon { icon.image.font(Theme.icon(13, weight: .semibold)) }
@@ -159,5 +172,6 @@ struct ExerciseFilters: View {
         .buttonStyle(PressableStyle())
         .accessibilityAddTraits(on ? .isSelected : [])
         .motion(Motion.spring, value: on)
+        .id(id)
     }
 }

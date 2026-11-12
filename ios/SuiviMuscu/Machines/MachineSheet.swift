@@ -14,6 +14,7 @@ struct MachineSheet: View {
     @State private var showLibrary = false
     @State private var showCamera = false
     @State private var chooseSource = false
+    @State private var confirmRemove = false
     @State private var busy = false
     @State private var failed = false
 
@@ -95,23 +96,35 @@ struct MachineSheet: View {
     private func photoSection(_ ex: Exercise) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Ta machine à la salle")
-            if let photo = MachinePhoto.image(for: ex) {
+            if let photo = ex.photo, !photo.isEmpty {
                 // Hauteur bornée : une photo en portrait ne repousse pas les boutons hors de l'écran.
-                Image(uiImage: photo)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
-                    .frame(maxWidth: .infinity, maxHeight: 300)
-                    .accessibilityLabel("Photo de la machine \(ex.name)")
+                // Même décodeur que les vignettes, à la taille de la fiche (hors du fil principal).
+                DataURLImageView(owner: ex.id, dataURL: photo, points: 400, contentMode: .fit) {
+                    RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
+                        .fill(Theme.softFill)
+                        .frame(height: 220)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
+                .frame(maxWidth: .infinity, maxHeight: 300)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Photo de la machine \(ex.name)")
                 HStack(spacing: 8) {
                     sourceChoice(actionButton(busy ? "Préparation…" : "Changer", icon: .photo, prominent: false, action: takePhoto))
                         .disabled(busy)
                     actionButton("Retirer", icon: .delete, prominent: false, destructive: true) {
-                        var e = ex
-                        e.photo = nil
-                        store.saveExercise(e)
+                        confirmRemove = true
                     }
                     .disabled(busy)
+                    // Accrochée au bouton : la bulle pointe vers lui.
+                    .confirmationDialog("Retirer la photo ?", isPresented: $confirmRemove,
+                                        titleVisibility: .visible) {
+                        Button("Retirer la photo", role: .destructive) {
+                            var e = current
+                            e.photo = nil
+                            store.saveExercise(e)
+                        }
+                        Button("Annuler", role: .cancel) {}
+                    }
                 }
             } else {
                 sourceChoice(actionButton(busy ? "Préparation…" : "Prendre la machine en photo", icon: .photo,
@@ -225,6 +238,8 @@ private struct MovementSection: View {
                     ZStack(alignment: .bottomLeading) {
                         frame(urls.start, label: nil).opacity(showEnd ? 0 : 1)
                         frame(urls.end, label: nil).opacity(showEnd ? 1 : 0)
+                        // Une étiquette par image, qui sort avant que l'autre n'entre : les deux
+                        // textes ne sont jamais dessinés l'un sur l'autre (le tout reste ≤ 350 ms).
                         Text(showEnd ? "Arrivée" : "Départ")
                             .font(Theme.font(.caption, weight: .semibold))
                             .foregroundStyle(Theme.ink)
@@ -232,6 +247,10 @@ private struct MovementSection: View {
                             .padding(.vertical, 4)
                             .background(Capsule().fill(Theme.raisedFill))
                             .padding(10)
+                            .id(showEnd)
+                            .transition(.asymmetric(
+                                insertion: .opacity.animation(.easeIn(duration: 0.15).delay(0.2)),
+                                removal: .opacity.animation(.easeOut(duration: 0.15))))
                             .accessibilityHidden(true)
                     }
                     .accessibilityElement(children: .ignore)

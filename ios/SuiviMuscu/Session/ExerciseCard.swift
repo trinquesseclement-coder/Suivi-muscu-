@@ -356,8 +356,8 @@ struct ExerciseThumb: View {
 
     var body: some View {
         Group {
-            if let photo = MachinePhoto.image(for: exercise) {
-                Image(uiImage: photo).resizable().scaledToFill()
+            if let photo = exercise.photo, !photo.isEmpty {
+                DataURLImageView(owner: exercise.id, dataURL: photo, points: size) { placeholder }
             } else if let url = Illustrations.urls(for: exercise.id)?.start {
                 RemoteImage(url: url) { placeholder }
             } else {
@@ -377,25 +377,6 @@ struct ExerciseThumb: View {
             .foregroundStyle(Theme.ink2)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white.opacity(0.6))
-    }
-}
-
-/// Photo de machine décodée une seule fois (liste, carte de séance et fiche partagent ce cache).
-/// La clé évite de hacher les ~40 Ko du data URL à chaque affichage : id, longueur et deux extraits.
-@MainActor
-enum MachinePhoto {
-    private static let cache = NSCache<NSString, UIImage>()
-
-    static func image(for exercise: Exercise) -> UIImage? {
-        guard let url = exercise.photo, !url.isEmpty else { return nil }
-        let utf8 = url.utf8
-        let key = "\(exercise.id)|\(utf8.count)|\(String(decoding: utf8.dropFirst(utf8.count / 2).prefix(48), as: UTF8.self))|\(String(decoding: utf8.suffix(48), as: UTF8.self))" as NSString
-        if let hit = cache.object(forKey: key) { return hit }
-        let payload = url.range(of: ",").map { String(url[$0.upperBound...]) } ?? url
-        guard let data = Data(base64Encoded: payload, options: .ignoreUnknownCharacters),
-              let image = UIImage(data: data) else { return nil }
-        cache.setObject(image, forKey: key)
-        return image
     }
 }
 
