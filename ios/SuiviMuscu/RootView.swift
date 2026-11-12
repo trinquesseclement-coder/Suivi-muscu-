@@ -122,7 +122,7 @@ struct RootView: View {
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
     /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
-    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -135,7 +135,7 @@ struct RootView: View {
         if let i = args.firstIndex(of: "-planning-week"), i + 1 < args.count {
             planningWeek = args[i + 1]
         }
-        if args.contains("-open-settings") { showSettings = true; return }
+        if args.contains("-open-settings") || args.contains("-import-file") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
         } else if args.contains("-open-next"),

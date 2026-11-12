@@ -5,7 +5,7 @@ enum AppIcon: String, CaseIterable {
     case home, planning, add, load, machines, settings, sessions, time, timer, trophy, goal
     case together, wheelchair, transfer, standing, help, plate, cardio, sync, offline, photo, pyramid, play
     case back, forward, up, down, more, check, close, minus, copy, rename, delete, classic, search, map
-    case expand, table, hidden
+    case expand, table, hidden, export, importFile, warning
 
     var symbolName: String {
         switch self {
@@ -49,6 +49,9 @@ enum AppIcon: String, CaseIterable {
         case .expand: "chevron.up.chevron.down"
         case .table: "tablecells"
         case .hidden: "eye.slash"
+        case .export: "square.and.arrow.up"
+        case .importFile: "square.and.arrow.down"
+        case .warning: "exclamationmark.triangle"
         }
     }
 

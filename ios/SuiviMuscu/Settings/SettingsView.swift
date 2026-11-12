@@ -27,6 +27,7 @@ struct SettingsView: View {
                         SettingsStepper(title: "Temps de repos", valueText: Self.restText(restSeconds),
                                         value: $restSeconds, range: 30...180, step: 15)
                     }
+                    BackupSection()
                     gymCard
                 }
                 .padding(.horizontal, 16)
