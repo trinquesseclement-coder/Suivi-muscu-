@@ -32,30 +32,30 @@ struct NextSessionCard: View {
             .buttonStyle(PressableStyle())
             .accessibilityHint(live ? "Reprendre la séance" : "Ouvrir la séance")
         } else {
-            HStack(spacing: 12) {
-                Text("Aucune séance prévue")
-                    .font(Theme.font(.headline, weight: .semibold))
-                Spacer(minLength: 0)
-                Button(action: onFree) {
-                    HStack(spacing: 6) {
-                        AppIcon.play.image.font(.system(size: 13, weight: .bold))
-                        Text("Séance libre").font(Theme.font(.subheadline, weight: .semibold))
+            // Même forme que la carte « Prochaine séance » : tout le bandeau lance une séance libre.
+            Button(action: onFree) {
+                HStack(spacing: 12) {
+                    playBadge
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aucune séance prévue")
+                            .font(Theme.font(.footnote))
+                            .opacity(0.7)
+                        Text("Lancer une séance libre")
+                            .font(Theme.font(.headline, weight: .semibold))
+                            .lineLimit(2)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: Theme.minTouch)
-                    .background(Capsule().fill(Theme.orange))
-                    .zoomSource("free", in: zoom)
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(PressableStyle())
+                .modifier(DarkBand())
+                .zoomSource("free", in: zoom)
             }
-            .modifier(DarkBand())
+            .buttonStyle(PressableStyle())
         }
     }
 
     private var playBadge: some View {
         AppIcon.play.image
-            .font(.system(size: 17, weight: .bold))
+            .font(Theme.icon(17, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 44, height: 44)
             .background(Circle().fill(Theme.orange))
@@ -83,23 +83,30 @@ struct PartnerLiveCard: View {
                     .font(Theme.font(.subheadline))
                     .foregroundStyle(Theme.ink2)
             }
-            .frame(maxWidth: .infinity, minHeight: Theme.minTouch, alignment: .leading)
-            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .glassCard()
         }
         .buttonStyle(PressableStyle())
+        .accessibilityHint("Voir sa séance")
     }
 }
 
-/// Pastille verte « En cours ».
+/// Pastille verte « En cours ». `onDark` : posée sur le fond dégradé (en-tête de la séance).
 struct LivePill: View {
+    var onDark = false
+
     var body: some View {
-        Text("En cours")
-            .font(Theme.font(.caption, weight: .medium))
-            .foregroundStyle(Color(hex: 0x00632F))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(Theme.success.opacity(0.22)))
+        HStack(spacing: 5) {
+            Circle().fill(onDark ? Color(hex: 0x7CE08A) : Theme.success).frame(width: 7, height: 7)
+            Text("En cours")
+        }
+        .font(Theme.font(.caption, weight: .semibold))
+        .foregroundStyle(onDark ? Color.white : Color(hex: 0x00632F))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(onDark ? Color.white.opacity(0.18) : Theme.success.opacity(0.2)))
     }
 }
 
@@ -109,8 +116,9 @@ private struct DarkBand: ViewModifier {
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous).fill(Theme.ink))
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            // Même rayon que les cartes, pour que les blocs empilés aient tous les mêmes coins.
+            .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.ink))
             .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
     }
 }

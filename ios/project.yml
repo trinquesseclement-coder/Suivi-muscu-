@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: fr.suivimuscu
   deploymentTarget:
     iOS: "18.0"
+  developmentLanguage: fr
 packages:
   SuiviCore:
     path: SuiviCore
@@ -14,6 +15,12 @@ targets:
       - SuiviMuscu
     dependencies:
       - package: SuiviCore
+    # Heure et batterie en blanc sur le fond sombre de l'appli (les autres clés sont générées par Xcode).
+    info:
+      path: SuiviMuscu/Info.plist
+      properties:
+        UIViewControllerBasedStatusBarAppearance: false
+        UIStatusBarStyle: UIStatusBarStyleLightContent
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.suivimuscu.app

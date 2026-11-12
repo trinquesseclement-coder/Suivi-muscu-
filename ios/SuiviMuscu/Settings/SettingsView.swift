@@ -9,100 +9,141 @@ struct SettingsView: View {
 
     private static let gymMapsURL = URL(string: "https://maps.apple.com/?q=KOMEX%2C%2064B%20rue%20Sully%2C%2021000%20Dijon")!
 
+    /// L'autre profil est replié par défaut : on règle surtout le sien.
+    @State private var showPartner = false
+
     var body: some View {
-        ZStack {
+        let me = store.me
+        let partner = store.partner
+        return ZStack {
             Theme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     header
-                    profilesCard
-                    sessionCard
+                    whoCard
+                    card("Mon profil") { ProfileEditor(profile: me).id(me.id) }
+                    partnerCard(partner)
+                    card("Séance") {
+                        SettingsStepper(title: "Temps de repos", valueText: Self.restText(restSeconds),
+                                        value: $restSeconds, range: 30...180, step: 15)
+                    }
                     gymCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .toolbar(.hidden, for: .navigationBar)
         // Une ancienne valeur hors bornes (30 à 180 s) est ramenée dans la plage.
         .onAppear { restSeconds = min(180, max(30, restSeconds)) }
     }
 
+    private static func restText(_ s: Int) -> String {
+        s < 60 ? "\(s) s" : s % 60 == 0 ? "\(s / 60) min" : "\(s / 60) min \(s % 60) s"
+    }
+
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Button { dismiss() } label: {
                 AppIcon.back.image
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(Theme.icon(17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .frame(width: Theme.minTouch, height: Theme.minTouch)
                     .background(Circle().fill(Theme.glass))
+                    .overlay(Circle().strokeBorder(Theme.glassBorder, lineWidth: 1))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableStyle())
             .accessibilityLabel("Retour")
             Text("Réglages")
                 .font(Theme.font(.title2, weight: .bold))
-                .foregroundStyle(Color(hex: 0xEEF3F0))
+                .foregroundStyle(Theme.onBackground)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
+        .padding(.bottom, 4)
     }
 
-    private var profilesCard: some View {
+    /// Une carte de réglages : un titre, puis son contenu, toujours avec le même rythme.
+    private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Profils").font(Theme.font(.title3, weight: .semibold))
+            Text(title)
+                .font(Theme.font(.headline, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Sur ce téléphone, je suis").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-                SettingsSegmented(options: store.profiles.map { ($0.id, $0.name) }, selection: store.meId,
-                                  label: "Profil actif") { store.switchProfile(to: $0) }
-            }
-            ForEach(store.profiles) { p in
-                Divider()
-                ProfileEditor(profile: p)
-            }
+            content()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
     }
 
-    private var sessionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Séance").font(Theme.font(.title3, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
-            SettingsStepper(title: "Temps de repos par défaut", valueText: "\(restSeconds) s",
-                            value: $restSeconds, range: 30...180, step: 15)
+    private var whoCard: some View {
+        card("Sur ce téléphone, je suis") {
+            SettingsSegmented(options: store.profiles.map { ($0.id, $0.name) }, selection: store.meId,
+                              label: "Profil actif") { store.switchProfile(to: $0) }
         }
-        .padding(16)
+    }
+
+    /// Le profil de l'autre, replié : une ligne à toucher pour l'ouvrir.
+    private func partnerCard(_ partner: Profile) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                showPartner.toggle()
+            } label: {
+                HStack(spacing: 12) {
+                    ProfileAvatar(profile: partner, size: 36)
+                    Text("Profil de \(partner.name)")
+                        .font(Theme.font(.headline, weight: .semibold))
+                    Spacer(minLength: 8)
+                    AppIcon.back.image
+                        .font(Theme.icon(13, weight: .bold))
+                        .foregroundStyle(Theme.ink2)
+                        .rotationEffect(.degrees(showPartner ? 90 : -90))
+                }
+                .frame(minHeight: Theme.minTouch)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(showPartner ? "Replier" : "Déplier")
+            if showPartner {
+                ProfileEditor(profile: partner).id(partner.id)
+                    .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, showPartner ? 16 : 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
+        .motion(Motion.spring, value: showPartner)
     }
 
     private var gymCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Ma salle").font(Theme.font(.title3, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("KOMEX").font(Theme.font(.body, weight: .semibold))
-                Text("64B rue Sully, 21000 Dijon").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-                Text("7j/7, 5h–23h · Tram : Mazen-Sully · parking gratuit à proximité")
-                    .font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-            }
-            Link(destination: Self.gymMapsURL) {
-                HStack(spacing: 8) {
-                    AppIcon.map.image
-                    Text("Plans").font(Theme.font(.body, weight: .semibold))
+        card("Ma salle") {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("KOMEX").font(Theme.font(.body, weight: .semibold))
+                    Text("64B rue Sully, 21000 Dijon")
+                        .font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
+                    Text("7j/7, 5h–23h")
+                        .font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
+                    Text("Tram Mazen-Sully · parking gratuit à proximité")
+                        .font(Theme.font(.footnote)).foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .frame(minHeight: Theme.minTouch)
-                .background(Capsule().fill(Theme.ink))
+                Spacer(minLength: 8)
+                Link(destination: Self.gymMapsURL) {
+                    VStack(spacing: 3) {
+                        AppIcon.map.image.font(Theme.icon(17, weight: .semibold))
+                        Text("Plans").font(Theme.font(.caption, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 64, height: 64)
+                    .background(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous).fill(Theme.ink))
+                }
+                .accessibilityLabel("Ouvrir KOMEX dans Plans")
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
     }
 }
 
@@ -124,26 +165,37 @@ private struct ProfileEditor: View {
     private var goal: Int { current.settings?.weeklyGoal ?? 3 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AvatarPicker(profile: current) { avatar in
-                var p = current; p.avatar = avatar; store.saveProfile(p)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                AvatarPicker(profile: current) { avatar in
+                    var p = current; p.avatar = avatar; store.saveProfile(p)
+                }
             }
-            TextField("Prénom", text: $name)
-                .font(Theme.font(.body, weight: .semibold))
-                .focused($nameFocused)
-                .submitLabel(.done)
-                .onSubmit(commitName)
-                .onChange(of: nameFocused) { _, focused in if !focused { commitName() } }
-                .padding(.horizontal, 14)
-                .frame(minHeight: Theme.minTouch)
-                .background(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous).fill(Color.white.opacity(0.7)))
-                .accessibilityLabel("Prénom de \(current.name)")
+            VStack(alignment: .leading, spacing: 6) {
+                fieldLabel("Prénom")
+                TextField("Prénom", text: $name)
+                    .font(Theme.font(.body, weight: .semibold))
+                    .focused($nameFocused)
+                    .submitLabel(.done)
+                    .onSubmit(commitName)
+                    .onChange(of: nameFocused) { _, focused in if !focused { commitName() } }
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: Theme.minTouch)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.7)))
+                    .accessibilityLabel("Prénom de \(current.name)")
+            }
 
-            Toggle("A besoin d’aide pour les disques", isOn: Binding(
+            Toggle(isOn: Binding(
                 get: { Rules.profileNeedsHelp(current) },
-                set: { v in var p = current; p.needsHelp = v; store.saveProfile(p) }))
-                .tint(tint)
-                .frame(minHeight: Theme.minTouch)
+                set: { v in var p = current; p.needsHelp = v; store.saveProfile(p) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Aide pour les disques").font(Theme.font(.body, weight: .medium))
+                    Text("Affiche « Aide » sur les machines à charger.")
+                        .font(Theme.font(.footnote)).foregroundStyle(Theme.ink2)
+                }
+            }
+            .tint(tint)
+            .frame(minHeight: Theme.minTouch)
 
             SettingsStepper(title: "Objectif par semaine", valueText: "\(goal) séance\(goal > 1 ? "s" : "")",
                             value: Binding(
@@ -152,15 +204,25 @@ private struct ProfileEditor: View {
                     p.settings = s; store.saveProfile(p) }), range: 1...7, step: 1)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Schéma par défaut").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
-                SettingsSegmented(options: [(RepScheme.pyramid, "Pyramide 12/10/8/12"), (RepScheme.classic, "Classique")],
-                                  selection: Rules.defaultScheme(for: current), label: "Schéma par défaut") { v in
+                fieldLabel("Façon de s’entraîner")
+                SettingsSegmented(options: [(RepScheme.pyramid, "Pyramide"), (RepScheme.classic, "Classique")],
+                                  selection: Rules.defaultScheme(for: current), label: "Façon de s’entraîner") { v in
                     var p = current; var s = p.settings ?? ProfileSettings(); s.defaultScheme = v
                     p.settings = s; store.saveProfile(p)
                 }
+                Text(Rules.defaultScheme(for: current) == .pyramid
+                     ? "4 séries : 12 · 10 · 8 · 12. La dernière reprend la charge de la première."
+                     : "Mêmes répétitions et même charge à chaque série.")
+                    .font(Theme.font(.footnote))
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .onDisappear(perform: commitName)
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text).font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
     }
 
     private func commitName() {
@@ -184,6 +246,7 @@ private struct SettingsStepper: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
                 Text(valueText).font(Theme.font(.body, weight: .semibold)).monospacedDigit()
+                    .contentTransition(.numericText(value: Double(value)))
             }
             Spacer(minLength: 8)
             button(.minus, delta: -step, label: "moins")
@@ -202,13 +265,15 @@ private struct SettingsStepper: View {
         }
     }
 
-    private func set(_ v: Int) { value = min(range.upperBound, max(range.lowerBound, v)) }
+    private func set(_ v: Int) {
+        withAnimation(Motion.reduced) { value = min(range.upperBound, max(range.lowerBound, v)) }
+    }
 
     private func button(_ icon: AppIcon, delta: Int, label: String) -> some View {
         let next = value + delta
         let enabled = range.contains(next)
         return Button { set(next) } label: {
-            icon.image.font(.system(size: 17, weight: .bold))
+            icon.image.font(Theme.icon(17, weight: .bold))
                 .foregroundStyle(Theme.ink)
                 .frame(width: Theme.minTouch, height: Theme.minTouch)
                 .background(Circle().fill(Color.white.opacity(0.62)))

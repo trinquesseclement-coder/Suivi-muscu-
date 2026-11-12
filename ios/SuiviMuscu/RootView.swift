@@ -77,7 +77,7 @@ struct RootView: View {
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
                      onAvatar: { showSettings = true })
         case .planning, .load, .machines:
-            Text("Bientôt").font(Theme.font(.title2, weight: .semibold)).foregroundStyle(.white)
+            ComingSoon(tab: tab)
         }
     }
 
@@ -102,6 +102,7 @@ struct RootView: View {
         #if DEBUG
         guard path.isEmpty else { return }
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("-open-settings") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = [SessionRoute(id: args[i + 1], source: "launch")]
         } else if args.contains("-open-next"),
@@ -111,20 +112,26 @@ struct RootView: View {
         #endif
     }
 
+    /// Barre d'onglets flottante : cinq cases de même largeur, alignées sur les cartes (16 pt de marge),
+    /// chaque onglet avec son nom, et le « + » orange au centre.
     private var tabBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             tabButton(.home)
             tabButton(.planning)
-            addButton
+            addButton.frame(maxWidth: .infinity)
             tabButton(.load)
             tabButton(.machines)
         }
-        .padding(4)
-        .background(Capsule().fill(Theme.glass))
+        .padding(5)
+        .background(Capsule().fill(Theme.barFill))
         .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
         .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 6)
+        .background { BottomFade() }
+        // Comme la barre d'onglets du système, elle ne grossit pas au-delà des tailles standards.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func tabButton(_ t: AppTab) -> some View {
@@ -133,20 +140,20 @@ struct RootView: View {
             if tab != t { bounce += 1 }
             withAnimation(reduceMotion ? Motion.reduced : Motion.spring) { tab = t }
         } label: {
-            HStack(spacing: 4) {
+            VStack(spacing: 2) {
                 t.icon.image
-                    .font(.system(size: 20, weight: .medium))
+                    .symbolVariant(active ? .fill : .none)
+                    .font(Theme.icon(18, weight: .medium))
                     .symbolEffect(.bounce, options: .nonRepeating, isActive: active && !reduceMotion && bounce > 0)
-                if active {
-                    Text(t.label).font(Theme.font(.subheadline, weight: .medium))
-                        .lineLimit(1).minimumScaleFactor(0.75)
-                }
+                Text(t.label)
+                    .font(Theme.font(.caption2, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, active ? 12 : 0)
-            .frame(minWidth: Theme.minTouch, minHeight: Theme.minTouch)
-            .foregroundStyle(active ? Color.white : Theme.ink)
-            .background(Capsule().fill(active ? Theme.ink : Color.white.opacity(0.55)))
-            .overlay(Capsule().strokeBorder(Theme.ink.opacity(active ? 0 : 0.7), lineWidth: 1.5))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .foregroundStyle(active ? Color.white : Theme.ink2)
+            .background(Capsule().fill(active ? Theme.ink : Color.clear))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(t.label)
@@ -156,13 +163,51 @@ struct RootView: View {
     private var addButton: some View {
         Button { startFreeSession(source: "add") } label: {
             AppIcon.add.image
-                .font(.system(size: 22, weight: .semibold))
+                .font(Theme.icon(22, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: Theme.minTouch, height: Theme.minTouch)
+                .frame(width: 52, height: 52)
                 .background(Circle().fill(Theme.orange))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
         .zoomSource("add", in: zoom)
         .accessibilityLabel("Séance libre")
+    }
+}
+
+/// Onglet pas encore construit : dit ce qui arrive, plutôt qu'un écran muet.
+private struct ComingSoon: View {
+    let tab: AppTab
+
+    private var text: String {
+        switch tab {
+        case .planning: "Le planning de la semaine arrive : tu pourras préparer une séance pour toi, pour l’autre ou pour vous deux."
+        case .load: "Le tableau de charge arrive : tes séances, tes heures et ta progression machine par machine."
+        case .machines: "Le catalogue des machines arrive : photos, réglages du siège et corrections."
+        case .home: ""
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            tab.icon.image
+                .font(Theme.icon(22, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.white.opacity(0.7)))
+            Text(tab.label).font(Theme.font(.title3, weight: .bold))
+            Text(text)
+                .font(Theme.font(.subheadline))
+                .foregroundStyle(Theme.ink2)
+                .multilineTextAlignment(.center)
+            Text("Bientôt")
+                .font(Theme.font(.caption, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 5)
+                .background(Capsule().fill(Theme.ink.opacity(0.08)))
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .glassCard()
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .combine)
     }
 }

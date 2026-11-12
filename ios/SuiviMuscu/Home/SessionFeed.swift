@@ -15,12 +15,12 @@ struct SessionFeed: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Activité récente")
                 .font(Theme.font(.title3, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.onBackground)
                 .padding(.horizontal, 2)
                 .accessibilityAddTraits(.isHeader)
 
             if sessions.isEmpty {
-                Text("Pas encore de séance. La première, c’est la plus importante.")
+                Text("Aucune séance terminée ces deux derniers mois.")
                     .font(Theme.font(.subheadline))
                     .foregroundStyle(Theme.ink2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -139,7 +139,7 @@ struct Pill: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let icon { icon.image.font(.system(size: 11, weight: .semibold)) }
+            if let icon { icon.image.font(Theme.icon(11, weight: .semibold)) }
             Text(text).monospacedDigit()
         }
         .font(Theme.font(.caption, weight: .medium))

@@ -31,7 +31,7 @@ struct RecordBurst: View {
                     }
                 }
                 AppIcon.trophy.image
-                    .font(.system(size: 40, weight: .bold))
+                    .font(Theme.icon(40, weight: .bold))
                     .foregroundStyle(Self.gold)
                     .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
                     .scaleEffect(reduceMotion ? 1 : f.scale)

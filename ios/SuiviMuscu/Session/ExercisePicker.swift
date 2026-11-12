@@ -62,7 +62,7 @@ struct ExercisePicker: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -86,7 +86,7 @@ struct ExercisePicker: View {
             Spacer(minLength: 0)
             Button { dismiss() } label: {
                 AppIcon.close.image
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(Theme.icon(17, weight: .semibold))
                     .frame(width: Theme.minTouch, height: Theme.minTouch)
                     .contentShape(Rectangle())
             }
@@ -99,7 +99,7 @@ struct ExercisePicker: View {
     }
 
     private var filters: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 AppIcon.search.image.foregroundStyle(Theme.ink2)
                 TextField("Chercher une machine…", text: $query)
@@ -111,7 +111,7 @@ struct ExercisePicker: View {
                     .accessibilityLabel("Chercher")
                 if !query.isEmpty {
                     Button { query = "" } label: {
-                        AppIcon.close.image.font(.system(size: 14, weight: .bold))
+                        AppIcon.close.image.font(Theme.icon(14, weight: .bold))
                             .frame(width: Theme.minTouch, height: Theme.minTouch)
                             .contentShape(Rectangle())
                     }
@@ -121,16 +121,18 @@ struct ExercisePicker: View {
             }
             .padding(.leading, 16)
             .padding(.trailing, query.isEmpty ? 16 : 0)
-            .frame(minHeight: 52)
+            .frame(minHeight: Theme.minTouch)
             .background(Capsule().fill(Color.white.opacity(0.85)))
             .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.1), lineWidth: 1))
+            .padding(.bottom, 4)
 
+            // Posture et aide sur une seule rangée qui défile : la liste commence plus haut.
             chips {
                 postureChip("Depuis le fauteuil", .fauteuil, icon: .wheelchair)
                 postureChip("Transfert", .transfert, icon: nil)
                 postureChip("Debout", .debout, icon: nil)
-            }
-            chips {
+                Capsule().fill(Theme.ink.opacity(0.12)).frame(width: 1.5, height: 22)
+                    .accessibilityHidden(true)
                 chip("Avec aide", on: help == .with, icon: .help) { help = help == .with ? .all : .with }
                 chip("Sans aide", on: help == .without, icon: nil) { help = help == .without ? .all : .without }
             }
@@ -147,10 +149,10 @@ struct ExercisePicker: View {
     private func chips<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) { content() }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 16)
         }
         .scrollIndicators(.hidden)
-        .padding(.horizontal, -12)
+        .padding(.horizontal, -16)
     }
 
     private func postureChip(_ title: String, _ value: Posture, icon: AppIcon?) -> some View {
@@ -160,16 +162,18 @@ struct ExercisePicker: View {
     private func chip(_ title: String, on: Bool, icon: AppIcon?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if let icon { icon.image.font(.system(size: 13, weight: .semibold)) }
+                if let icon { icon.image.font(Theme.icon(13, weight: .semibold)) }
                 Text(title)
             }
-            .font(Theme.font(.subheadline, weight: .semibold))
+            .font(Theme.font(.subheadline, weight: .medium))
             .foregroundStyle(on ? Color.white : Theme.ink)
-            .padding(.horizontal, 16)
-            .frame(minHeight: Theme.minTouch)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 38)
             .background(Capsule().fill(on ? Theme.ink : Color.white.opacity(0.85)))
             .overlay(Capsule().strokeBorder(Theme.ink.opacity(on ? 0 : 0.1), lineWidth: 1))
-            .contentShape(Capsule())
+            // La puce fait 38 pt de haut, sa zone tactile 48.
+            .frame(minHeight: Theme.minTouch)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -187,33 +191,42 @@ struct ExercisePicker: View {
                 ZStack {
                     Circle().strokeBorder(on ? Color.clear : Theme.ink.opacity(0.3), lineWidth: 1.5)
                     Circle().fill(on ? Theme.profile1 : Color.clear)
-                    if on { AppIcon.check.image.font(.system(size: 13, weight: .bold)).foregroundStyle(.white) }
+                    if on { AppIcon.check.image.font(Theme.icon(13, weight: .bold)).foregroundStyle(.white) }
                 }
                 .frame(width: 28, height: 28)
-                ExerciseThumb(exercise: ex)
-                VStack(alignment: .leading, spacing: 5) {
+                ExerciseThumb(exercise: ex, size: 44)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(ex.name)
-                        .font(Theme.font(.headline, weight: .semibold))
+                        .font(Theme.font(.body, weight: .semibold))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                    FlowLayout(spacing: 6) {
-                        Pill(text: Catalogue.muscleLabel(ex.muscle))
-                        switch ex.posture {
-                        case .fauteuil: Pill(text: "Fauteuil", icon: .wheelchair, fill: Theme.profile1.opacity(0.18))
-                        case .transfert: Pill(text: "Transfert")
-                        case .debout: Pill(text: "Debout")
+                    HStack(spacing: 6) {
+                        if ex.posture == .fauteuil {
+                            AppIcon.wheelchair.image
+                                .font(Theme.icon(12, weight: .semibold))
+                                .foregroundStyle(Theme.profile1)
                         }
-                        if ex.help { Pill(text: "Avec aide", icon: .help, fill: Theme.profile2.opacity(0.16)) }
+                        Text("\(Catalogue.muscleLabel(ex.muscle)) · \(Self.postureLabel(ex.posture))")
+                            .font(Theme.font(.footnote))
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(1)
+                        if ex.help {
+                            HStack(spacing: 3) {
+                                AppIcon.help.image.font(Theme.icon(11, weight: .semibold))
+                                Text("Aide")
+                            }
+                            .font(Theme.font(.caption, weight: .medium))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Theme.profile2.opacity(0.16)))
+                        }
                     }
-                    Text(Self.machineLabel(ex))
-                        .font(Theme.font(.footnote))
-                        .foregroundStyle(Theme.ink2)
                 }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
             .background(on ? Theme.profile1.opacity(0.10) : Color.clear)
             .contentShape(Rectangle())
         }
@@ -234,15 +247,15 @@ struct ExercisePicker: View {
             onAdd(chosen)
             dismiss()
         } label: {
-            Text(n > 0 ? "Ajouter (\(n))" : "Ajouter")
+            Text(n > 0 ? "Ajouter (\(n))" : "Choisis des exercices")
                 .font(Theme.font(.headline, weight: .semibold))
                 .foregroundStyle(Color.white)
-                .frame(maxWidth: .infinity, minHeight: 56)
+                .frame(maxWidth: .infinity, minHeight: 52)
                 .background(Capsule().fill(Theme.ink.opacity(n > 0 ? 1 : 0.35)))
         }
         .buttonStyle(PressableStyle())
         .disabled(n == 0)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 8)
         .background(Color(hex: 0xECF1EF).shadow(.drop(color: .black.opacity(0.08), radius: 6, y: -2)))
@@ -254,29 +267,19 @@ struct ExercisePicker: View {
         s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
     }
 
+    private static func postureLabel(_ p: Posture) -> String {
+        switch p {
+        case .fauteuil: "Fauteuil"
+        case .transfert: "Transfert"
+        case .debout: "Debout"
+        }
+    }
+
     private static func postureText(_ p: Posture) -> String {
         switch p {
         case .fauteuil: "depuis le fauteuil"
         case .transfert: "transfert"
         case .debout: "debout"
         }
-    }
-
-    /// « Hammer Strength · Machine à disques » (comme `machineLabel` du web).
-    private static func machineLabel(_ ex: Exercise) -> String {
-        let equipment: String = switch ex.equipment {
-        case .machine: "Machine guidée"
-        case .disques: "Machine à disques"
-        case .poulie: "Poulie"
-        case .smith: "Smith machine"
-        case .halteres: "Haltères"
-        case .cardio: "Cardio"
-        }
-        let brand: String? = switch ex.brand {
-        case .technogym: "Technogym"
-        case .hammer: "Hammer Strength"
-        case .autre, nil: nil
-        }
-        return brand.map { "\($0) · \(equipment)" } ?? equipment
     }
 }

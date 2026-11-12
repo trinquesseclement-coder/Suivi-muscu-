@@ -51,15 +51,8 @@ struct ExerciseCard: View {
                 }
                 .padding(12)
             } else {
-                if editable {
-                    SchemeToggle(scheme: item.scheme ?? .classic) { scheme in
-                        onChange({ Rules.switchScheme($0, to: scheme) }, false)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 10)
-                }
                 sets
-                    .padding(.top, 10)
+                    .padding(.top, 12)
                 if editable { footer }
                 else { Spacer().frame(height: 8) }
             }
@@ -93,19 +86,37 @@ struct ExerciseCard: View {
                 FlowLayout(spacing: 6) { badges }
             }
             Spacer(minLength: 0)
-            if editable {
-                Button(action: onRemove) {
-                    AppIcon.close.image
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: Theme.minTouch, height: Theme.minTouch)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .padding(.top, -8)
-                .padding(.trailing, -10)
-                .accessibilityLabel("Retirer \(exercise.name)")
-            }
+            if editable { optionsMenu }
         }
+    }
+
+    /// « … » : changer de schéma ou retirer l'exercice. Le « ✕ » d'avant ressemblait à « fermer »
+    /// et retirait l'exercice d'un seul toucher.
+    private var optionsMenu: some View {
+        let other: RepScheme = (item.scheme ?? .classic) == .pyramid ? .classic : .pyramid
+        return Menu {
+            if exercise.kind == .muscu {
+                Button {
+                    onChange({ Rules.switchScheme($0, to: other) }, false)
+                } label: {
+                    Label {
+                        Text(other == .pyramid ? "Passer en pyramide 12 · 10 · 8 · 12" : "Passer en séries classiques")
+                    } icon: { (other == .pyramid ? AppIcon.pyramid : AppIcon.classic).image }
+                }
+            }
+            Button(role: .destructive, action: onRemove) {
+                Label { Text("Retirer de la séance") } icon: { AppIcon.delete.image }
+            }
+        } label: {
+            AppIcon.more.image
+                .font(Theme.icon(17, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+                .frame(width: Theme.minTouch, height: Theme.minTouch)
+                .contentShape(Rectangle())
+        }
+        .padding(.top, -10)
+        .padding(.trailing, -12)
+        .accessibilityLabel("Options de \(exercise.name)")
     }
 
     @ViewBuilder private var badges: some View {
@@ -116,6 +127,9 @@ struct ExerciseCard: View {
         }
         if let helpLabel {
             Pill(text: helpLabel, icon: .help, fill: Theme.profile2.opacity(0.16))
+        }
+        if exercise.kind == .muscu, item.scheme == .pyramid {
+            Pill(text: "Pyramide", icon: .pyramid)
         }
     }
 
@@ -165,49 +179,44 @@ struct ExerciseCard: View {
     private var footer: some View {
         let lastDone = item.sets.last?.done ?? true
         return HStack(spacing: 8) {
-            Button {
+            footerButton("Série", icon: .add, label: "Ajouter une série") {
                 onChange({ x in
                     var x = x
                     let prev = x.sets.last ?? SetEntry(kg: 0, reps: 10, done: false)
                     x.sets.append(SetEntry(kg: prev.kg, reps: prev.reps, done: false))
                     return x
                 }, false)
-            } label: {
-                HStack(spacing: 6) {
-                    AppIcon.add.image.font(.system(size: 15, weight: .bold))
-                    Text("Série")
-                }
-                .font(Theme.font(.subheadline, weight: .semibold))
-                .padding(.horizontal, 16)
-                .frame(minHeight: Theme.minTouch)
-                .background(Capsule().fill(Color.white.opacity(0.7)))
-                .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.12), lineWidth: 1))
             }
-            .buttonStyle(PressableStyle())
-            .accessibilityLabel("Ajouter une série")
-
-            if !item.sets.isEmpty {
-                Button {
-                    onChange({ x in
-                        var x = x
-                        if x.sets.last?.done == false { x.sets.removeLast() }
-                        return x
-                    }, false)
-                } label: {
-                    Text("Retirer la dernière")
-                        .font(Theme.font(.subheadline, weight: .semibold))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: Theme.minTouch)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .disabled(lastDone)
-                .opacity(lastDone ? 0.4 : 1)
+            // Une série validée ne se retire pas : il faut d'abord la décocher.
+            footerButton("Série", icon: .minus, label: "Retirer la dernière série") {
+                onChange({ x in
+                    var x = x
+                    if x.sets.last?.done == false { x.sets.removeLast() }
+                    return x
+                }, false)
             }
-            Spacer(minLength: 0)
+            .disabled(lastDone)
+            .opacity(lastDone ? 0.4 : 1)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+    }
+
+    private func footerButton(_ title: String, icon: AppIcon, label: String,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                icon.image.font(Theme.icon(13, weight: .bold))
+                Text(title)
+            }
+            .font(Theme.font(.subheadline, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: Theme.minTouch)
+            .background(Capsule().fill(Color.white.opacity(0.62)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
     }
 }
 
@@ -235,7 +244,7 @@ struct SchemeToggle: View {
             if !active { onChange(value) }
         } label: {
             HStack(spacing: 5) {
-                icon.image.font(.system(size: 11, weight: .bold))
+                icon.image.font(Theme.icon(11, weight: .bold))
                 Text(title)
             }
             .font(Theme.font(.footnote, weight: .semibold))
@@ -287,7 +296,7 @@ struct CardioBlock: View {
                     onChange(c, c.done)
                 } label: {
                     HStack(spacing: 8) {
-                        AppIcon.check.image.font(.system(size: 17, weight: .bold))
+                        AppIcon.check.image.font(Theme.icon(17, weight: .bold))
                         Text(cardio.done ? "Fait" : "Valider le cardio")
                     }
                     .font(Theme.font(.headline, weight: .semibold))
@@ -335,6 +344,7 @@ struct CardioBlock: View {
 /// Vignette 52 pt : photo de la machine si elle existe, sinon l'illustration de départ.
 struct ExerciseThumb: View {
     let exercise: Exercise
+    var size: CGFloat = 52
 
     var body: some View {
         Group {
@@ -346,7 +356,7 @@ struct ExerciseThumb: View {
                 placeholder
             }
         }
-        .frame(width: 52, height: 52)
+        .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
             .strokeBorder(Theme.ink.opacity(0.1), lineWidth: 1))
@@ -355,7 +365,7 @@ struct ExerciseThumb: View {
 
     private var placeholder: some View {
         (exercise.kind == .cardio ? AppIcon.cardio : AppIcon.machines).image
-            .font(.system(size: 20, weight: .medium))
+            .font(Theme.icon(20, weight: .medium))
             .foregroundStyle(Theme.ink2)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white.opacity(0.6))

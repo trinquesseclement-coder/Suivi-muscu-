@@ -7,24 +7,26 @@ struct TogetherCard: View {
     let minutes: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                AppIcon.together.image
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.profile1)
+        HStack(spacing: 12) {
+            AppIcon.together.image
+                .font(Theme.icon(16, weight: .semibold))
+                .foregroundStyle(Theme.profile1)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Theme.profile1.opacity(0.14)))
+            VStack(alignment: .leading, spacing: 1) {
                 Text("Ensemble")
-                    .font(Theme.font(.caption, weight: .medium))
-                    .textCase(.uppercase)
-                    .tracking(0.5)
+                    .font(Theme.font(.footnote, weight: .semibold))
                     .foregroundStyle(Theme.ink2)
+                message
+                    .font(Theme.font(.subheadline, weight: days == 0 ? .regular : .medium))
+                    .contentTransition(.numericText(value: Double(days)))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            message
-                .font(Theme.font(.body))
-                .contentTransition(.numericText(value: Double(days)))
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .glassCard()
         .accessibilityElement(children: .combine)
     }

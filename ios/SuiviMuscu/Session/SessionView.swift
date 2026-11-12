@@ -75,11 +75,9 @@ struct SessionView: View {
                         .glassCard()
                 }
 
-                // Affiché dès l'ouverture de sa propre séance : rien ne se décale sous le doigt
+                // Toujours là dès qu'il y a des exercices : rien ne se décale sous le doigt
                 // quand la première série est validée.
-                if !s.items.isEmpty && (editable || (s.status == .done && progress)) {
-                    tiles(s, byId: byId)
-                }
+                if !s.items.isEmpty { progressStrip(s) }
 
                 ForEach(s.items) { it in
                     if let ex = byId[it.exerciseId] {
@@ -97,37 +95,50 @@ struct SessionView: View {
                 }
 
                 if s.items.isEmpty {
-                    Text(editable ? "Ajoute ton premier exercice." : "Séance vide.")
-                        .font(Theme.font(.subheadline))
-                        .foregroundStyle(Theme.ink2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .glassCard()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(editable ? "Séance vide pour l’instant" : "Séance vide")
+                            .font(Theme.font(.headline, weight: .semibold))
+                        if editable {
+                            Text("Ajoute tes machines au fur et à mesure. Les charges de la dernière fois se remplissent toutes seules.")
+                                .font(Theme.font(.subheadline))
+                                .foregroundStyle(Theme.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .glassCard()
                 }
 
                 if editable {
                     Button(action: addExercise) {
                         HStack(spacing: 8) {
-                            AppIcon.add.image.font(.system(size: 17, weight: .bold))
+                            AppIcon.add.image.font(Theme.icon(17, weight: .bold))
                             Text("Ajouter un exercice")
                         }
                         .font(Theme.font(.headline, weight: .semibold))
                         .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(Capsule().fill(Theme.glass))
                         .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
                     }
                     .buttonStyle(PressableStyle())
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if editable { bottomBar(s, progress: progress) }
+            // Pas de bouton « Fermer » : le retour est en haut. La barre n'apparaît que
+            // quand il y a un repos en cours ou une séance à terminer.
+            if editable && (progress || rest.isActive) {
+                bottomBar(s, progress: progress)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .motion(Motion.spring, value: progress || rest.isActive)
         .sheet(isPresented: $picking) {
             ExercisePicker { exercises in addExercises(exercises) }
         }
@@ -147,6 +158,7 @@ struct SessionView: View {
             Button("Annuler", role: .cancel) {}
         }
         .onAppear { if celebrated == nil { celebrated = Set(prs) } }
+        .task { debugLaunchHooks(s) }
         .onChange(of: prs) { _, now in celebrate(now) }
         .onChange(of: keepAwake, initial: true) { _, on in UIApplication.shared.isIdleTimerDisabled = on }
         // Au centre de l'écran, par-dessus tout, sans capter les touchers.
@@ -174,23 +186,19 @@ struct SessionView: View {
                     Text(Format.day(s.date, today: Dates.isoDate(Date())))
                         .font(Theme.font(.subheadline))
                         .opacity(0.8)
-                }
-                // Ligne réservée : « Prévue » devient « En cours » sans décaler l'écran.
-                Group {
+                    // Sur la même ligne : « Prévue » devient « En cours » sans décaler l'écran.
                     if Rules.isLive(s) {
-                        LivePill()
+                        LivePill(onDark: true)
                     } else if s.status == .planned {
                         Pill(text: "Prévue")
                     }
                 }
-                .frame(height: 26)
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
             optionsMenu(s, editable: editable)
         }
-        .foregroundStyle(.white)
-        .padding(.bottom, 4)
+        .foregroundStyle(Theme.onBackground)
     }
 
     private func circleButton(_ icon: AppIcon, label: String, action: @escaping () -> Void) -> some View {
@@ -203,9 +211,9 @@ struct SessionView: View {
 
     private func circle(_ icon: AppIcon) -> some View {
         icon.image
-            .font(.system(size: 18, weight: .semibold))
+            .font(Theme.icon(17, weight: .semibold))
             .foregroundStyle(Theme.ink)
-            .frame(width: 52, height: 52)
+            .frame(width: Theme.minTouch, height: Theme.minTouch)
             .background(Circle().fill(Theme.glass))
             .overlay(Circle().strokeBorder(Theme.glassBorder, lineWidth: 1))
     }
@@ -236,66 +244,78 @@ struct SessionView: View {
         }
     }
 
-    // MARK: Bilan
+    // MARK: Avancement
 
-    private func tiles(_ s: Session, byId: [String: Exercise]) -> some View {
-        let done = Stats.startedItemCount(s)
-        let sets = Stats.sessionSetCount(s)
-        let cardio = Stats.sessionCardioMinutes(s, byId: byId)
-        return HStack(spacing: 8) {
-            tile("\(done)/\(s.items.count)", "exercices", value: Double(done))
-            tile(Format.tonnage(Stats.sessionTonnage(s)), "\(sets) série\(sets > 1 ? "s" : "")",
-                 value: Stats.sessionTonnage(s))
-            tile("\(cardio) min", "cardio", value: Double(cardio))
+    /// Une barre fine et une ligne : combien de séries (ou de cardios) sont validés, et le tonnage.
+    /// Elle remplace les trois tuiles, qui prenaient la place des séries pour afficher des zéros.
+    private func progressStrip(_ s: Session) -> some View {
+        let total = s.items.reduce(0) { $0 + ($1.cardio != nil ? 1 : $1.sets.count) }
+        let done = s.items.reduce(0) { n, it in
+            n + (it.cardio.map { $0.done ? 1 : 0 } ?? it.sets.filter(\.done).count)
         }
-        .padding(8)
-        .glassCard()
-    }
-
-    private func tile(_ big: String, _ small: String, value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(big)
-                .font(Theme.font(.title3, weight: .bold))
-                .monospacedDigit()
-                .contentTransition(.numericText(value: value))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(small).font(Theme.font(.caption)).foregroundStyle(Theme.ink2)
+        let tonnage = Stats.sessionTonnage(s)
+        let fraction = total > 0 ? Double(done) / Double(total) : 0
+        return VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.22))
+                    Capsule()
+                        .fill(fraction >= 1 ? Theme.success : Color.white)
+                        .frame(width: max(fraction > 0 ? 6 : 0, geo.size.width * fraction))
+                }
+            }
+            .frame(height: 6)
+            .motion(Motion.spring, value: done)
+            HStack(spacing: 8) {
+                Text("\(done) sur \(total) validé\(done > 1 ? "s" : "")")
+                    .contentTransition(.numericText(value: Double(done)))
+                Spacer(minLength: 8)
+                if tonnage > 0 {
+                    Text("\(Format.tonnage(tonnage)) soulevés")
+                        .contentTransition(.numericText(value: tonnage))
+                }
+            }
+            .font(Theme.font(.footnote, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(Theme.onBackground.opacity(0.85))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
-            .fill(Color.white.opacity(0.6)))
-        .accessibilityElement(children: .combine)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Avancement")
+        .accessibilityValue("\(done) sur \(total)" + (tonnage > 0 ? ", \(Format.tonnage(tonnage)) soulevés" : ""))
     }
 
     // MARK: Barre du bas
 
     private func bottomBar(_ s: Session, progress: Bool) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if rest.isActive {
                 RestTimer(model: rest)
                     .transition(.opacity)
             }
-            Button {
-                if progress { finishing = true } else { dismiss() }
-            } label: {
-                Text(progress ? (s.endedAt == nil ? "Terminer" : "Modifier le bilan") : "Fermer")
-                    .font(Theme.font(.headline, weight: .semibold))
-                    .foregroundStyle(progress ? Color.white : Theme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(Capsule().fill(progress ? Theme.ink : Color.white.opacity(0.8)))
+            if progress {
+                Button { finishing = true } label: {
+                    Text(s.endedAt == nil ? "Terminer" : "Modifier le bilan")
+                        .font(Theme.font(.headline, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(Capsule().fill(Theme.ink))
+                }
+                .buttonStyle(PressableStyle())
+            } else {
+                Spacer(minLength: 0)
             }
-            .buttonStyle(PressableStyle())
         }
-        .padding(6)
-        .background(Capsule().fill(Theme.glass))
+        .padding(5)
+        .background(Capsule().fill(Theme.barFill))
         .overlay(Capsule().strokeBorder(Theme.glassBorder, lineWidth: 1))
         .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 20)
         .padding(.bottom, 6)
+        .background { BottomFade() }
         .motion(Motion.spring, value: rest.isActive)
     }
 
@@ -308,10 +328,24 @@ struct SessionView: View {
             Text("Elle a peut-être été supprimée.").font(Theme.font(.subheadline)).opacity(0.8)
             Spacer()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Theme.onBackground)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
         .padding(.top, 4)
+    }
+
+    /// Mise au point (DEBUG) : ouvre un état précis de l'écran pour le capturer.
+    private func debugLaunchHooks(_ s: Session) {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-open-picker") { picking = true }
+        if args.contains("-validate-first"), let first = s.items.first(where: { !$0.sets.isEmpty }),
+           first.sets.first?.done == false {
+            updateItem(first.id, started: true) { var x = $0; x.sets[0].done = true; return x }
+            onSetValidated()
+        }
+        if args.contains("-open-finish") { finishing = true }
+        #endif
     }
 
     // MARK: Repos et ajout d'exercices
