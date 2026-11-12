@@ -103,6 +103,19 @@ struct StoreTests {
         #expect(try Data(contentsOf: backup) == Data("pas du json {".utf8))
     }
 
+    @Test func writeFailureIsSurfaced() throws {
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("x".utf8).write(to: blocker)
+        let store = AppStore(fileURL: blocker.appendingPathComponent("suivi.json"))
+        #expect(store.lastSaveError == nil)
+        store.saveSession(makeSession())
+        #expect(store.lastSaveError != nil)
+        #expect(store.sessions.count == 1)
+        let ok = AppStore(fileURL: tempFile())
+        ok.saveSession(makeSession())
+        #expect(ok.lastSaveError == nil)
+    }
+
     @Test func demoDataLoads() {
         let now = Date()
         let today = Dates.isoDate(now)

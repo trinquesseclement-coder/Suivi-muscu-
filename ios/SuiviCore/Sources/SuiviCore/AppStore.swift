@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// Forme du fichier : mêmes clés que le cache web, dictionnaires indexés par id.
 struct StoreFile: Codable {
@@ -26,6 +27,9 @@ public final class AppStore {
     private var sessionMap: [String: Session]
     private var overrides: [String: Exercise]
     public private(set) var meId: String
+    /// Description de la dernière erreur d'écriture, `nil` si la dernière écriture a réussi.
+    public private(set) var lastSaveError: String?
+    @ObservationIgnored private static let log = Logger(subsystem: "fr.suivimuscu.app", category: "AppStore")
 
     // MARK: Lecture
 
@@ -155,12 +159,18 @@ public final class AppStore {
     }
 
     private func persist() {
-        let file = StoreFile(profiles: profileMap, sessions: sessionMap, exercises: overrides, meId: meId)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(file) else { return }
-        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(),
-                                                 withIntermediateDirectories: true)
-        try? data.write(to: fileURL, options: .atomic)
+        do {
+            let file = StoreFile(profiles: profileMap, sessions: sessionMap, exercises: overrides, meId: meId)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(file)
+            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try data.write(to: fileURL, options: .atomic)
+            if lastSaveError != nil { lastSaveError = nil }
+        } catch {
+            lastSaveError = String(describing: error)
+            Self.log.error("Échec de l'écriture : \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
