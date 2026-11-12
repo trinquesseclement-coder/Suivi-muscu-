@@ -40,20 +40,16 @@ struct FilterState: Codable, Equatable {
 
     // MARK: Mémoire de l'écran
 
-    /// Filtres mémorisés sous `key` (JSON). `postureKey` : la posture a sa propre clé (celle du
-    /// sélecteur, `picker.posture`, existait avant les autres filtres).
-    static func stored(_ key: String, postureKey: String? = nil) -> FilterState {
-        let defaults = UserDefaults.standard
-        var state = defaults.string(forKey: key)
+    /// Filtres mémorisés sous `key` (JSON) : posture, aide et muscle (onglet Machines).
+    static func stored(_ key: String) -> FilterState {
+        UserDefaults.standard.string(forKey: key)
             .flatMap { try? JSONDecoder().decode(FilterState.self, from: Data($0.utf8)) } ?? FilterState()
-        if let postureKey { state.posture = defaults.string(forKey: postureKey).flatMap(Posture.init(rawValue:)) }
-        return state
     }
 
-    func store(_ key: String, postureKey: String? = nil) {
-        let defaults = UserDefaults.standard
-        if let data = try? JSONEncoder().encode(self) { defaults.set(String(decoding: data, as: UTF8.self), forKey: key) }
-        if let postureKey { defaults.set(posture?.rawValue ?? "", forKey: postureKey) }
+    func store(_ key: String) {
+        if let data = try? JSONEncoder().encode(self) {
+            UserDefaults.standard.set(String(decoding: data, as: UTF8.self), forKey: key)
+        }
     }
 }
 

@@ -9,7 +9,6 @@ struct PlanningView: View {
     var zoom: Namespace.ID? = nil
     var onOpenSession: (String) -> Void
     var onPlan: (_ date: String) -> Void
-    var onEditPlan: (_ sessionId: String) -> Void
 
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -31,7 +30,7 @@ struct PlanningView: View {
                 // Les lignes entrent du côté où l'on va ; l'ancienne semaine s'efface sur place.
                 ZStack(alignment: .top) {
                     DayRows(days: days, today: today, now: now, zoom: zoom,
-                            onSession: tap, onPlan: onPlan)
+                            onSession: { onOpenSession($0.id) }, onPlan: onPlan)
                         .id(days[0])
                         .transition(.asymmetric(insertion: insertion, removal: .opacity))
                 }
@@ -73,15 +72,6 @@ struct PlanningView: View {
     private func goToday(_ today: String) {
         direction = today < week ? -1 : 1
         withAnimation(reduceMotion ? Motion.reduced : Motion.spring) { week = today }
-    }
-
-    /// Séance prévue que j'ai créée et pas encore commencée : l'éditeur ; le reste s'ouvre normalement.
-    private func tap(_ s: Session) {
-        if Rules.isEditablePlan(s, meId: store.meId) {
-            onEditPlan(s.id)
-        } else {
-            onOpenSession(s.id)
-        }
     }
 
     private func header(_ days: [String]) -> some View {
@@ -194,8 +184,7 @@ private struct DayRows: View {
                             ForEach(list) { s in
                                 let owner = profiles.first { $0.id == s.ownerId }
                                 SessionChip(session: s, owner: owner, live: Rules.isLive(s, now: now),
-                                            help: PlanningWeek.helpCount(s, profiles: profiles, byId: byId),
-                                            editable: Rules.isEditablePlan(s, meId: store.meId)) {
+                                            help: PlanningWeek.helpCount(s, profiles: profiles, byId: byId)) {
                                     onSession(s)
                                 }
                                 .zoomSource("planning-\(s.id)", in: zoom)
@@ -271,7 +260,6 @@ private struct SessionChip: View {
     let owner: Profile?
     let live: Bool
     let help: Int
-    let editable: Bool
     let action: () -> Void
 
     private var planned: Bool { session.status == .planned }
@@ -323,7 +311,7 @@ private struct SessionChip: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint(editable ? "Modifier la séance prévue" : "Ouvrir la séance")
+        .accessibilityHint("Ouvrir la séance")
     }
 
     private var accessibilityText: String {

@@ -12,17 +12,24 @@ public enum BackupText {
         return "\(first), \(exercises) réglage\(exercises > 1 ? "s" : "") de machine\(exercises > 1 ? "s" : "")"
     }
 
-    /// « 10 ajoutées, 2 mises à jour, 0 gardée (plus récente sur ce téléphone) », puis
-    /// « , 3 illisibles ignorées » seulement s'il y en a.
+    /// « 10 séances ajoutées, 2 mises à jour. » : seules les parts non nulles, dans l'ordre ajoutées,
+    /// mises à jour, gardées, illisibles ; « séance(s) » n'est dit qu'une fois, dans la première part.
+    /// Tout à zéro : « Tout était déjà à jour. »
     public static func summary(_ s: ImportSummary) -> String {
-        let keptPlural = s.kept > 1
-        var text = "\(s.added) ajoutée\(s.added > 1 ? "s" : ""), "
-            + "\(s.updated) \(s.updated > 1 ? "mises" : "mise") à jour, "
-            + "\(s.kept) gardée\(keptPlural ? "s" : "") (plus récente\(keptPlural ? "s" : "") sur ce téléphone)"
-        if s.skipped > 0 {
-            text += ", \(s.skipped) illisible\(s.skipped > 1 ? "s" : "") ignorée\(s.skipped > 1 ? "s" : "")"
+        // (nombre, singulier, pluriel) sans le nom « séance ».
+        let parts: [(Int, String, String)] = [
+            (s.added, "ajoutée", "ajoutées"),
+            (s.updated, "mise à jour", "mises à jour"),
+            (s.kept, "gardée car plus récente sur ce téléphone", "gardées car plus récentes sur ce téléphone"),
+            (s.skipped, "illisible ignorée", "illisibles ignorées"),
+        ]
+        var pieces: [String] = []
+        for (count, one, many) in parts where count > 0 {
+            let noun = pieces.isEmpty ? (count > 1 ? " séances" : " séance") : ""
+            pieces.append("\(count)\(noun) \(count > 1 ? many : one)")
         }
-        return text
+        guard !pieces.isEmpty else { return "Tout était déjà à jour." }
+        return pieces.joined(separator: ", ") + "."
     }
 
     /// « suivi-muscu-2026-11-12.json » pour la date du jour au format AAAA-MM-JJ.

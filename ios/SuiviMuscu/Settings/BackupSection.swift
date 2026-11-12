@@ -12,7 +12,9 @@ private struct BackupExport: Transferable {
         FileRepresentation(exportedContentType: .json) { item in
             let data = await item.store.exportData()
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sauvegarde", isDirectory: true)
-            try? FileManager.default.removeItem(at: dir)
+            // Jamais de suppression du dossier : le système peut appeler ce bloc deux fois (aperçu,
+            // puis destination) et l'un effacerait le fichier que l'autre vient d'écrire. On écrase
+            // le fichier du jour, d'un coup (`.atomic`).
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let url = dir.appendingPathComponent(item.fileName)
             try data.write(to: url, options: .atomic)

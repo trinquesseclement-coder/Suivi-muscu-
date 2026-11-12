@@ -3,12 +3,21 @@ import UIKit
 import ImageIO
 
 /// Le seul décodeur des images stockées en data URL (`data:image/jpeg;base64,…`) : photos de profil
-/// et photos de machines. Le décodage se fait hors du fil principal, réduit à la taille affichée
-/// (une vignette de 52 pt ne garde pas en mémoire une photo de 800 px), et une seule fois par
-/// (image, taille) grâce au cache.
+/// et photos de machines. Le décodage est réduit à la taille affichée (une vignette de 52 pt ne garde
+/// pas en mémoire une photo de 800 px), et fait une seule fois par (image, taille) grâce au cache.
+/// Les petites images (avatars) se décodent tout de suite, pour être là dès la première image ; les
+/// grandes (photos de machines) hors du fil principal.
 @MainActor
 enum DataURLImage {
-    private static let cache = NSCache<NSString, UIImage>()
+    /// Plafonné à 64 Mo de pixels décodés (largeur × hauteur × 4 octets par image).
+    private static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
+        c.totalCostLimit = 64 * 1024 * 1024
+        return c
+    }()
+
+    /// Au-delà de cette longueur de data URL (~32 Ko, la taille d'un avatar), décodage hors du fil principal.
+    private static let syncLimit = 32 * 1024
 
     /// Clé de cache sans hacher les ~40 Ko du data URL à chaque affichage : propriétaire (profil ou
     /// machine), longueur, deux extraits du contenu, et la taille en pixels demandée.
@@ -28,14 +37,30 @@ enum DataURLImage {
 
     static func cached(_ key: NSString) -> UIImage? { cache.object(forKey: key) }
 
-    /// Décode et réduit hors du fil principal ; `nil` si le contenu n'est pas une image lisible.
+    /// Image prête sans attendre : déjà en cache, ou petite (avatar) et décodée sur place. `nil` pour
+    /// une grande image pas encore décodée (voir `load`) ou un contenu illisible.
+    static func immediate(dataURL: String, maxPixels: Int, key: NSString) -> UIImage? {
+        if let hit = cache.object(forKey: key) { return hit }
+        guard dataURL.utf8.count <= syncLimit, let image = decode(dataURL, maxPixels: maxPixels) else { return nil }
+        remember(image, key)
+        return image
+    }
+
+    /// Décode et réduit hors du fil principal ; `nil` si le contenu n'est pas une image lisible ou si
+    /// la tâche a été annulée entre-temps (rien n'est alors gardé).
     static func load(dataURL: String, maxPixels: Int, key: NSString) async -> UIImage? {
         if let hit = cache.object(forKey: key) { return hit }
         let image = await Task.detached(priority: .userInitiated) {
             decode(dataURL, maxPixels: maxPixels)
         }.value
-        if let image { cache.setObject(image, forKey: key) }
+        guard !Task.isCancelled, let image else { return nil }
+        remember(image, key)
         return image
+    }
+
+    private static func remember(_ image: UIImage, _ key: NSString) {
+        let cost = image.cgImage.map { $0.width * $0.height * 4 } ?? 0
+        cache.setObject(image, forKey: key, cost: cost)
     }
 
     private nonisolated static func decode(_ dataURL: String, maxPixels: Int) -> UIImage? {
@@ -72,8 +97,10 @@ struct DataURLImageView<Placeholder: View>: View {
     var body: some View {
         let maxPixels = DataURLImage.pixels(for: points, scale: scale)
         let key = DataURLImage.key(owner: owner, dataURL: dataURL, maxPixels: maxPixels)
-        // Lecture directe du cache au premier affichage : pas de passage par le substitut.
-        let shown = loadedKey == key ? image : DataURLImage.cached(key)
+        // Au premier affichage, le cache ou (petite image) le décodage sur place : pas de passage par
+        // le substitut, l'avatar est là dès la première image.
+        let shown = loadedKey == key ? image
+            : DataURLImage.immediate(dataURL: dataURL, maxPixels: maxPixels, key: key)
         Group {
             if let shown {
                 Image(uiImage: shown).resizable().aspectRatio(contentMode: contentMode)
@@ -83,6 +110,8 @@ struct DataURLImageView<Placeholder: View>: View {
         }
         .task(id: key) {
             let loaded = await DataURLImage.load(dataURL: dataURL, maxPixels: maxPixels, key: key)
+            // Tâche annulée (vue partie, autre image demandée) : ne rien écrire.
+            guard !Task.isCancelled else { return }
             image = loaded
             loadedKey = key
         }

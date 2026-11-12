@@ -32,22 +32,33 @@ struct BackupTextTests {
         #expect(BackupText.content(content(sessions: 0, deleted: 3)) == "aucune séance")
     }
 
-    @Test func summaryAgreement() {
-        func s(_ a: Int, _ u: Int, _ k: Int, _ x: Int = 0) -> String {
-            BackupText.summary(ImportSummary(added: a, updated: u, kept: k, skipped: x))
-        }
-        #expect(s(10, 2, 0) == "10 ajoutées, 2 mises à jour, 0 gardée (plus récente sur ce téléphone)")
-        #expect(s(0, 0, 0) == "0 ajoutée, 0 mise à jour, 0 gardée (plus récente sur ce téléphone)")
-        #expect(s(1, 1, 1) == "1 ajoutée, 1 mise à jour, 1 gardée (plus récente sur ce téléphone)")
-        #expect(s(0, 0, 3) == "0 ajoutée, 0 mise à jour, 3 gardées (plus récentes sur ce téléphone)")
+    func s(_ a: Int, _ u: Int, _ k: Int, _ x: Int = 0) -> String {
+        BackupText.summary(ImportSummary(added: a, updated: u, kept: k, skipped: x))
     }
 
-    @Test func summaryMentionsSkippedOnlyWhenAny() {
-        let one = BackupText.summary(ImportSummary(added: 1, updated: 0, kept: 0, skipped: 1))
-        #expect(one.hasSuffix(", 1 illisible ignorée"))
-        let many = BackupText.summary(ImportSummary(added: 1, updated: 0, kept: 0, skipped: 4))
-        #expect(many.hasSuffix(", 4 illisibles ignorées"))
-        #expect(!BackupText.summary(ImportSummary(added: 1, updated: 0, kept: 0, skipped: 0)).contains("illisible"))
+    @Test func summaryPinnedExamples() {
+        #expect(s(20, 0, 0) == "20 séances ajoutées.")
+        #expect(s(10, 2, 0) == "10 séances ajoutées, 2 mises à jour.")
+        #expect(s(0, 0, 3) == "3 séances gardées car plus récentes sur ce téléphone.")
+        #expect(s(1, 1, 1, 1) == "1 séance ajoutée, 1 mise à jour, 1 gardée car plus récente sur ce téléphone, 1 illisible ignorée.")
+        #expect(s(0, 0, 0) == "Tout était déjà à jour.")
+    }
+
+    @Test func summaryNamesSessionsOnlyInFirstPart() {
+        #expect(s(1, 0, 0) == "1 séance ajoutée.")
+        #expect(s(0, 1, 0) == "1 séance mise à jour.")
+        #expect(s(0, 2, 0) == "2 séances mises à jour.")
+        #expect(s(0, 0, 1) == "1 séance gardée car plus récente sur ce téléphone.")
+        #expect(s(0, 0, 0, 1) == "1 séance illisible ignorée.")
+        #expect(s(0, 0, 0, 2) == "2 séances illisibles ignorées.")
+        #expect(s(0, 2, 3) == "2 séances mises à jour, 3 gardées car plus récentes sur ce téléphone.")
+        #expect(s(0, 0, 1, 2) == "1 séance gardée car plus récente sur ce téléphone, 2 illisibles ignorées.")
+    }
+
+    @Test func summarySkipsZeroParts() {
+        #expect(!s(3, 0, 0).contains("jour"))
+        #expect(!s(3, 0, 0).contains("gardée"))
+        #expect(!s(3, 1, 2).contains("illisible"))
     }
 
     @Test func fileName() {

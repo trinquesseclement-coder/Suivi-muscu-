@@ -68,7 +68,9 @@ struct MachinesView: View {
 
     private func header(count: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 12) {
+            // Aligné en haut : le « + » (52 pt) ne pousse pas le titre vers le bas, qui reste à la même
+            // place que « Planning » et « Tableau de charge » (pas de saut en changeant d'onglet).
+            HStack(alignment: .top, spacing: 12) {
                 Text("Machines")
                     .font(Theme.font(.title, weight: .bold))
                     .accessibilityAddTraits(.isHeader)

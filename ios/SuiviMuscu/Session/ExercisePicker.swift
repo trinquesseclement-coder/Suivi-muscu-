@@ -12,14 +12,24 @@ struct ExercisePicker: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    /// Posture retenue d'une ouverture à l'autre sous `picker.posture` (clé du plan 1) ; aide et muscle
-    /// sous `picker.filters`. La recherche repart vide à chaque ouverture.
-    @State private var filters = FilterState.stored(Self.filtersKey, postureKey: Self.postureKey)
+    /// Seule la posture est retenue d'une ouverture à l'autre (`picker.posture`, clé du plan 1) : aide,
+    /// muscle et recherche repartent de « tout » à chaque ouverture (un muscle ou « Sans aide » oublié
+    /// cacherait des exercices).
+    @State private var filters = Self.storedFilters()
     @State private var picked: [String] = []
     @FocusState private var searching: Bool
 
-    private static let filtersKey = "picker.filters"
     private static let postureKey = "picker.posture"
+    /// Ancienne clé (aide et muscle retenus) : effacée à la lecture.
+    private static let staleFiltersKey = "picker.filters"
+
+    private static func storedFilters() -> FilterState {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: staleFiltersKey)
+        var state = FilterState()
+        state.posture = defaults.string(forKey: postureKey).flatMap(Posture.init(rawValue:))
+        return state
+    }
 
     private var helpMatters: Bool { Rules.profileNeedsHelp(owner ?? store.me) }
 
@@ -62,11 +72,13 @@ struct ExercisePicker: View {
             // Le clavier ouvert laisse peu de place : le bouton revient quand la recherche est fermée.
             if !searching { footer(byId) }
         }
-        .background(Color(hex: 0xECF1EF).ignoresSafeArea())
+        .background(Theme.sheetBackground.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .onChange(of: filters) { _, new in new.store(Self.filtersKey, postureKey: Self.postureKey) }
+        .onChange(of: filters.posture) { _, new in
+            UserDefaults.standard.set(new?.rawValue ?? "", forKey: Self.postureKey)
+        }
     }
 
     // MARK: En-tête
@@ -169,7 +181,7 @@ struct ExercisePicker: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 8)
-        .background(Color(hex: 0xECF1EF).shadow(.drop(color: .black.opacity(0.08), radius: 6, y: -2)))
+        .background(Theme.sheetBackground.shadow(.drop(color: .black.opacity(0.08), radius: 6, y: -2)))
     }
 
     // MARK: Textes

@@ -82,8 +82,7 @@ struct RootView: View {
         case .planning:
             PlanningView(week: $planningWeek, zoom: zoom,
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
-                         onPlan: { date in path.append(PlanRoute(date: date)) },
-                         onEditPlan: { id in path.append(PlanRoute(sessionId: id)) })
+                         onPlan: { date in path.append(PlanRoute(date: date)) })
         case .load:
             LoadView()
         case .machines:

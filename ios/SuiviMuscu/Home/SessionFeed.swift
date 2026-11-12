@@ -27,7 +27,7 @@ struct SessionFeed: View {
                     .padding(16)
                     .glassCard()
             } else {
-                let byId = store.exerciseById
+                let byId = store.exerciseAnyById
                 let all = store.sessions
                 let today = Dates.isoDate(Date())
                 let now = Date()
