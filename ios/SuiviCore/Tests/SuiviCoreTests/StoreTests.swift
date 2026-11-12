@@ -450,4 +450,76 @@ struct StoreTests {
         #expect(try Backup.decode(other.exportData()).sessions["s1"]?.deleted == true)
         #expect(other.exerciseById["m-chest-press"]?.note == "Siège cran 4")
     }
+
+    // MARK: Cycle
+
+    func storeJSON(sessions: String = "{}", cycle: String) -> String {
+        """
+        {"meId": "local-clement",
+         "profiles": {"local-clement": {"id": "local-clement", "name": "Clément", "slot": 1},
+                      "local-jules": {"id": "local-jules", "name": "Jules", "slot": 2}},
+         "sessions": \(sessions), "exercises": {}, "cycle": \(cycle)}
+        """
+    }
+
+    @Test func oldStoreFileLoadsWithStandardCycle() throws {
+        let url = tempFile()
+        let old = try encoded(makeSession())
+        #expect(!old.contains("cycleId"))
+        try writeRaw(storeJSON(sessions: #"{"s1": \#(old)}"#), to: url)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == nil)
+        #expect(try backups(of: url).isEmpty)
+        #expect(store.sessions.count == 1)
+        #expect(store.sessions[0].cycleId == nil)
+        #expect(store.cycle == Cycle.standard)
+        // Écrire n'ajoute pas de cycle tant qu'on n'en a pas enregistré.
+        store.saveSession(makeSession(id: "s2"))
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        #expect(json?["cycle"] == nil)
+    }
+
+    @Test func savedCycleSurvivesReload() throws {
+        let url = tempFile()
+        let store = AppStore(fileURL: url)
+        let mine = Cycle(templates: [
+            CycleTemplate(id: "t-haut", title: "Haut", items: [CycleItem(exerciseId: "m-curl")]),
+            CycleTemplate(id: "t-cardio", title: "Cardio", items: [CycleItem(exerciseId: "c-tapis", minutes: 20)]),
+        ])
+        store.saveCycle(mine)
+        #expect(store.lastSaveError == nil)
+        #expect(store.cycle == mine)
+        var s = makeSession()
+        s.cycleId = "t-haut"
+        store.saveSession(s)
+        let again = AppStore(fileURL: url)
+        #expect(again.cycle == mine)
+        #expect(again.session("s1")?.cycleId == "t-haut")
+    }
+
+    @Test func unreadableCycleFallsBackToStandard() throws {
+        let url = tempFile()
+        try writeRaw(storeJSON(sessions: #"{"s1": \#(try encoded(makeSession()))}"#, cycle: "42"), to: url)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == nil)
+        #expect(try backups(of: url).isEmpty)
+        #expect(store.sessions.count == 1)
+        #expect(store.cycle == Cycle.standard)
+        // Une écriture ne détruit pas la valeur illisible ; seul `saveCycle` la remplace.
+        store.saveSession(makeSession(id: "s2"))
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        #expect(json?["cycle"] as? Int == 42)
+        #expect(AppStore(fileURL: url).sessions.count == 2)
+        store.saveCycle(Cycle(templates: []))
+        #expect(AppStore(fileURL: url).cycle == Cycle(templates: []))
+    }
+
+    @Test func demoHasStandardCycle() {
+        let url = tempFile()
+        AppStore(fileURL: url).saveCycle(Cycle(templates: []))
+        let now = Date()
+        let store = AppStore.demo(fileURL: url, today: Dates.isoDate(now), now: now)
+        #expect(store.cycle == Cycle.standard)
+        #expect(AppStore(fileURL: url).cycle == Cycle.standard)
+    }
 }

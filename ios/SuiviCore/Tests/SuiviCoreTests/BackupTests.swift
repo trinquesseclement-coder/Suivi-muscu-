@@ -109,4 +109,33 @@ struct BackupTests {
             try Backup.decode(Data(#"{"profiles": {}, "sessions": [], "exercises": {}}"#.utf8))
         }
     }
+
+    @MainActor @Test func backupCarriesCycle() throws {
+        let mine = Cycle(templates: [CycleTemplate(id: "t-haut", title: "Haut",
+                                                   items: [CycleItem(exerciseId: "m-curl")])])
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let data = Backup.export(profiles: [:], sessions: [:], exercises: [:], cycle: mine, now: now)
+        #expect(try Backup.decode(data).cycle == mine)
+        // Sans cycle enregistré, la clé est absente ; illisible, elle est ignorée sans rejeter le reste.
+        let none = Backup.export(profiles: [:], sessions: [:], exercises: [:], now: now)
+        let json = try #require(try JSONSerialization.jsonObject(with: none) as? [String: Any])
+        #expect(json["cycle"] == nil)
+        #expect(try Backup.decode(none).cycle == nil)
+        let bad = #"{"profiles": {}, "sessions": {}, "exercises": {}, "cycle": {"templates": 3}}"#
+        #expect(try Backup.decode(Data(bad.utf8)).cycle == nil)
+
+        // Import : pris s'il n'y a pas de cycle enregistré, jamais à la place de celui du téléphone.
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fresh = AppStore(fileURL: dir.appendingPathComponent("a.json"))
+        _ = try fresh.importData(data)
+        #expect(fresh.cycle == mine)
+        let phone = Cycle(templates: [])
+        let owned = AppStore(fileURL: dir.appendingPathComponent("b.json"))
+        owned.saveCycle(phone)
+        _ = try owned.importData(data)
+        #expect(owned.cycle == phone)
+        #expect(AppStore(fileURL: dir.appendingPathComponent("b.json")).cycle == phone)
+        // L'export de l'appli emporte le cycle enregistré.
+        #expect(try Backup.decode(owned.exportData()).cycle == phone)
+    }
 }

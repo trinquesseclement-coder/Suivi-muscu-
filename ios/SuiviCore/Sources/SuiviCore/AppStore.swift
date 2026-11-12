@@ -9,19 +9,26 @@ struct StoreFile: Codable {
     /// Corrections du catalogue (parfois partielles, venues du web) et exercices personnalisés.
     var exercises: [String: ExerciseOverride]
     var meId: String
+    /// Cycle enregistré ; `nil` = cycle de départ.
+    var cycle: Cycle?
+    /// Valeur `cycle` présente mais illisible : réécrite telle quelle tant qu'aucun cycle n'est
+    /// enregistré, pour ne pas la détruire.
+    var unreadableCycle: JSONValue?
     /// Corrections illisibles ignorées au chargement (jamais écrit).
     var skippedExercises = 0
 
-    enum CodingKeys: String, CodingKey { case profiles, sessions, exercises, meId }
+    enum CodingKeys: String, CodingKey { case profiles, sessions, exercises, meId, cycle }
 
     init(profiles: [String: Profile], sessions: [String: Session],
-         exercises: [String: ExerciseOverride], meId: String) {
+         exercises: [String: ExerciseOverride], meId: String,
+         cycle: Cycle? = nil, unreadableCycle: JSONValue? = nil) {
         self.profiles = profiles; self.sessions = sessions; self.exercises = exercises; self.meId = meId
+        self.cycle = cycle; self.unreadableCycle = unreadableCycle
     }
 
     /// Profils et séances doivent être lisibles en entier (sinon tout le fichier part en copie
     /// `.corrupt`, pour ne jamais perdre une séance en réécrivant) ; une correction de machine
-    /// illisible est seulement ignorée.
+    /// ou un cycle illisibles sont seulement ignorés.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         profiles = try c.decode([String: Profile].self, forKey: .profiles)
@@ -30,6 +37,51 @@ struct StoreFile: Codable {
         exercises = lossy.byId(\.id)
         skippedExercises = lossy.skipped
         meId = try c.decode(String.self, forKey: .meId)
+        cycle = (try? c.decodeIfPresent(Cycle.self, forKey: .cycle)) ?? nil
+        if cycle == nil { unreadableCycle = (try? c.decodeIfPresent(JSONValue.self, forKey: .cycle)) ?? nil }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(profiles, forKey: .profiles)
+        try c.encode(sessions, forKey: .sessions)
+        try c.encode(exercises, forKey: .exercises)
+        try c.encode(meId, forKey: .meId)
+        if let cycle {
+            try c.encode(cycle, forKey: .cycle)
+        } else if let unreadableCycle {
+            try c.encode(unreadableCycle, forKey: .cycle)
+        }
+    }
+}
+
+/// N'importe quelle valeur JSON, gardée telle quelle pour être réécrite sans perte.
+enum JSONValue: Codable, Hashable {
+    case null, bool(Bool), int(Int), double(Double), string(String)
+    case array([JSONValue]), object([String: JSONValue])
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null }
+        else if let v = try? c.decode(Bool.self) { self = .bool(v) }
+        else if let v = try? c.decode(Int.self) { self = .int(v) }
+        else if let v = try? c.decode(Double.self) { self = .double(v) }
+        else if let v = try? c.decode(String.self) { self = .string(v) }
+        else if let v = try? c.decode([JSONValue].self) { self = .array(v) }
+        else { self = .object(try c.decode([String: JSONValue].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .null: try c.encodeNil()
+        case .bool(let v): try c.encode(v)
+        case .int(let v): try c.encode(v)
+        case .double(let v): try c.encode(v)
+        case .string(let v): try c.encode(v)
+        case .array(let v): try c.encode(v)
+        case .object(let v): try c.encode(v)
+        }
     }
 }
 
@@ -61,6 +113,10 @@ public final class AppStore {
     private var profileMap: [String: Profile]
     private var sessionMap: [String: Session]
     private var overrides: [String: ExerciseOverride]
+    /// Cycle enregistré, `nil` tant qu'on garde le cycle de départ.
+    private var storedCycle: Cycle?
+    /// Valeur `cycle` illisible du fichier, réécrite telle quelle jusqu'au prochain `saveCycle`.
+    @ObservationIgnored private var unreadableCycle: JSONValue?
     public private(set) var meId: String
     /// Description de la dernière erreur d'écriture, `nil` si la dernière écriture a réussi.
     public private(set) var lastSaveError: String?
@@ -112,6 +168,9 @@ public final class AppStore {
         return result
     }
 
+    /// Le cycle enregistré, sinon le cycle de départ.
+    public var cycle: Cycle { storedCycle ?? .standard }
+
     public var me: Profile {
         profileMap[meId] ?? profiles.first ?? Self.defaultProfiles[0]
     }
@@ -146,6 +205,8 @@ public final class AppStore {
         store.sessionMap = Dictionary(uniqueKeysWithValues: d.sessions.map { ($0.id, $0) })
         store.overrides = Dictionary(uniqueKeysWithValues: d.exercises.map { ($0.id, ExerciseOverride($0)) })
         store.meId = clementId
+        store.storedCycle = nil
+        store.unreadableCycle = nil
         store.persist()
         return store
     }
@@ -177,6 +238,13 @@ public final class AppStore {
         persist()
     }
 
+    /// Enregistre le cycle (il remplace aussi une valeur illisible lue au chargement).
+    public func saveCycle(_ cycle: Cycle) {
+        storedCycle = cycle
+        unreadableCycle = nil
+        persist()
+    }
+
     public func switchProfile(to id: String) {
         guard profileMap[id] != nil else { return }
         meId = id
@@ -198,13 +266,15 @@ public final class AppStore {
     public func exportData() -> Data {
         let base = Dictionary(uniqueKeysWithValues: Catalogue.base.map { ($0.id, $0) })
         let full = overrides.mapValues { o in o.applied(to: base[o.id]).map(ExerciseOverride.init) ?? o }
-        return Backup.export(profiles: profileMap, sessions: sessionMap, exercises: full, now: Date())
+        return Backup.export(profiles: profileMap, sessions: sessionMap, exercises: full, cycle: storedCycle,
+                             now: Date())
     }
 
     /// Importe une sauvegarde (web ou iOS) puis écrit une seule fois.
     /// - Séances : la plus récente selon `updatedAt` gagne, suppressions comprises.
     /// - Corrections de machines : fusionnées champ par champ, l'importée l'emporte.
     /// - Profils : jamais remplacés ; seuls `avatar` et `settings` sont pris s'ils manquent ici.
+    /// - Cycle : pris seulement si le téléphone n'en a aucun (ni enregistré, ni illisible gardé).
     /// Lève `BackupError` si ce n'est pas une sauvegarde, ou si le fichier de l'appli n'a pas pu
     /// être lu (rien n'est alors changé, ni en mémoire ni sur disque).
     public func importData(_ data: Data) throws -> ImportSummary {
@@ -237,6 +307,7 @@ public final class AppStore {
             if local.settings == nil { local.settings = incoming.settings }
             profileMap[incoming.id] = local
         }
+        if storedCycle == nil, unreadableCycle == nil, let cycle = content.cycle { storedCycle = cycle }
         persist()
         return summary
     }
@@ -285,6 +356,11 @@ public final class AppStore {
             for p in Self.defaultProfiles where profileMap[p.id] == nil { profileMap[p.id] = p }
             sessionMap = file.sessions
             overrides = file.exercises
+            storedCycle = file.cycle
+            unreadableCycle = file.unreadableCycle
+            if file.unreadableCycle != nil {
+                Self.log.error("Cycle illisible ignoré : cycle de départ utilisé")
+            }
             if file.skippedExercises > 0 {
                 Self.log.error("Corrections de machines illisibles ignorées : \(file.skippedExercises, privacy: .public)")
             }
@@ -325,7 +401,8 @@ public final class AppStore {
             return
         }
         do {
-            let file = StoreFile(profiles: profileMap, sessions: sessionMap, exercises: overrides, meId: meId)
+            let file = StoreFile(profiles: profileMap, sessions: sessionMap, exercises: overrides, meId: meId,
+                                 cycle: storedCycle, unreadableCycle: unreadableCycle)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             let data = try encoder.encode(file)
