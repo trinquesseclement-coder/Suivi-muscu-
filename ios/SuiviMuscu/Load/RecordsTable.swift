@@ -13,6 +13,8 @@ struct RecordsTable: View {
         let id: String
         let name: String
         let best: String
+        /// « 50 kilos, 10 répétitions », pour VoiceOver.
+        let bestSpoken: String
         let e1rm: String
         let date: String
     }
@@ -24,7 +26,9 @@ struct RecordsTable: View {
             .prefix(8)
             .map { pr in
                 Row(id: pr.exerciseId, name: byId[pr.exerciseId]?.name ?? pr.exerciseId,
-                    best: "\(Format.load(pr.kg)) × \(pr.reps)", e1rm: Format.number(pr.e1rm),
+                    best: "\(Format.load(pr.kg)) × \(pr.reps)",
+                    bestSpoken: "\(Format.load(pr.kg)) kilos, \(pr.reps) répétition\(pr.reps > 1 ? "s" : "")",
+                    e1rm: Format.number(pr.e1rm),
                     date: Format.dayMonth(pr.date))
             }
     }
@@ -112,6 +116,6 @@ struct RecordsTable: View {
     }
 
     private func spoken(_ r: Row) -> String {
-        "\(r.name) : meilleure série \(r.best) kilos, 1RM estimé \(r.e1rm) kilos, le \(r.date)"
+        "\(r.name) : meilleure série \(r.bestSpoken), 1RM estimé \(r.e1rm) kilos, le \(r.date)"
     }
 }

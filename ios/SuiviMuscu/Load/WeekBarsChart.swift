@@ -3,7 +3,7 @@ import Charts
 import SuiviCore
 
 /// Une série de barres : une personne, une valeur par semaine, dans sa couleur.
-struct BarSeries: Identifiable, Equatable {
+struct BarSeries: Identifiable, Hashable {
     let id: String
     let name: String
     let color: Color
@@ -21,8 +21,8 @@ extension BarSeries {
 }
 
 /// Barres par semaine (séances et heures, tonnage, cardio) : un seul graphique pour les trois.
-/// Les barres poussent depuis 0, semaine après semaine, à l'apparition et à chaque changement
-/// de données (changement de personne) ; un simple fondu avec « Réduire les animations ».
+/// Les barres poussent depuis 0, semaine après semaine, quand le graphique arrive à l'écran et à chaque
+/// changement de données (personne, « Avec … ») ; un fondu enchaîné avec « Réduire les animations ».
 struct WeekBarsChart: View {
     /// Lundis des semaines (YYYY-MM-DD), de la plus ancienne à la plus récente.
     let weeks: [String]
@@ -37,8 +37,15 @@ struct WeekBarsChart: View {
 
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 170
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var shown: [String: Double] = [:]
     @State private var visible = false
+    @State private var width: CGFloat = 0
+
+    /// Plafond du texte dans le graphique (le tableau prend le relais au-delà).
+    private static let maxType = DynamicTypeSize.xLarge
+    /// Place prise par l'axe vertical (libellés de 30 pt et leur marge).
+    private static let yAxisWidth: CGFloat = 38
 
     private func key(_ s: BarSeries, _ week: String) -> String { "\(s.id)|\(week)" }
 
@@ -54,6 +61,30 @@ struct WeekBarsChart: View {
         weeks.enumerated().filter { (weeks.count - 1 - $0.offset) % 2 == 0 }.map(\.element)
     }
 
+    /// Comment écrire les libellés au-dessus des barres sans qu'ils se touchent : en gras s'ils
+    /// tiennent dans la largeur d'une semaine, sinon en maigre, sinon une semaine sur deux.
+    private var labelStyle: (weight: Font.Weight, everyOther: Bool) {
+        let texts = series.flatMap { $0.labels ?? [] }.compactMap { $0 }
+        guard !texts.isEmpty, width > 0, !weeks.isEmpty else { return (.bold, false) }
+        let slot = (width - Self.yAxisWidth) / CGFloat(weeks.count) - 4
+        let size = min(typeSize, Self.maxType)
+        func widest(_ bold: Bool) -> CGFloat { texts.map { Self.textWidth($0, bold: bold, size: size) }.max() ?? 0 }
+        if widest(true) <= slot { return (.bold, false) }
+        if widest(false) <= slot { return (.regular, false) }
+        return (.regular, true)
+    }
+
+    /// Largeur d'un libellé en `caption2` arrondi, à la taille de texte donnée.
+    private static func textWidth(_ text: String, bold: Bool, size: DynamicTypeSize) -> CGFloat {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size))
+        var font = UIFont.preferredFont(forTextStyle: .caption2, compatibleWith: traits)
+        if let d = font.fontDescriptor.withDesign(.rounded) { font = UIFont(descriptor: d, size: font.pointSize) }
+        if bold, let d = font.fontDescriptor.withSymbolicTraits(.traitBold) {
+            font = UIFont(descriptor: d, size: font.pointSize)
+        }
+        return ceil((text as NSString).size(withAttributes: [.font: font]).width)
+    }
+
     @AxisMarkBuilder private func yAxisMark(_ value: AxisValue) -> some AxisMark {
         AxisGridLine().foregroundStyle(Theme.ink.opacity(0.1))
         AxisValueLabel {
@@ -65,27 +96,31 @@ struct WeekBarsChart: View {
         }
     }
 
-    @ChartContentBuilder private func bar(_ s: BarSeries, _ i: Int, _ week: String) -> some ChartContent {
-        let value = shown[key(s, week)] ?? 0
+    @ChartContentBuilder private func bar(_ s: BarSeries, _ i: Int, _ week: String,
+                                          style: (weight: Font.Weight, everyOther: Bool)) -> some ChartContent {
+        // Avec « Réduire les animations », pas de pousse : les vraies valeurs, en fondu.
+        let value = reduceMotion ? s.values[i] : (shown[key(s, week)] ?? 0)
+        let skipped = style.everyOther && (weeks.count - 1 - i) % 2 != 0
         BarMark(x: .value("Semaine", week), y: .value("Valeur", value), width: .ratio(0.62))
             .foregroundStyle(s.color)
             .cornerRadius(4)
             .position(by: .value("Personne", s.id))
             .annotation(position: .top, spacing: 3) {
-                if let text = s.labels?[i], value > 0 {
+                if let text = s.labels?[i], value > 0, !skipped {
                     Text(text)
-                        .font(Theme.font(.caption2, weight: .bold))
+                        .font(Theme.font(.caption2, weight: style.weight))
                         .foregroundStyle(Theme.ink)
                         .fixedSize()
                 }
             }
     }
 
-    var body: some View {
-        Chart {
+    private var chart: some View {
+        let style = labelStyle
+        return Chart {
             ForEach(series) { s in
                 ForEach(Array(weeks.enumerated()), id: \.offset) { i, week in
-                    bar(s, i, week)
+                    bar(s, i, week, style: style)
                 }
             }
         }
@@ -108,22 +143,32 @@ struct WeekBarsChart: View {
             }
         }
         .chartLegend(.hidden)
+    }
+
+    var body: some View {
+        ZStack {
+            // En mode réduit, changer de données remplace le graphique par un fondu enchaîné.
+            chart.id(reduceMotion ? series : [])
+                .transition(.opacity)
+        }
+        .animation(reduceMotion ? Motion.reduced : nil, value: series)
         .frame(height: height)
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
+        .dynamicTypeSize(...Self.maxType)
         .opacity(visible ? 1 : 0)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityTitle)
         .accessibilityValue(accessibilitySummary)
-        .task(id: series) {
+        .chartEntrance(key: series, reset: { shown = [:]; visible = false }) { reduce in
             await grow(groups: weeks.enumerated().map { i, w in series.map { (key($0, w), $0.values[i]) } },
-                       into: $shown, visible: $visible, reduceMotion: reduceMotion)
+                       into: $shown, visible: $visible, reduceMotion: reduce)
         }
     }
 }
 
 /// Fait pousser des valeurs depuis 0, groupe après groupe, au rythme de `Motion.stagger`
-/// (chaque groupe avec `Motion.spring`, 350 ms). Avec « Réduire les animations », les valeurs
-/// arrivent d'un coup et le graphique apparaît en fondu. Rien n'est bloqué pendant ce temps.
+/// (chaque groupe avec `Motion.spring`, 350 ms). Avec « Réduire les animations », le graphique
+/// (qui montre alors directement ses vraies valeurs) apparaît en fondu. Rien n'est bloqué.
 @MainActor
 func grow(groups: [[(String, Double)]], into shown: Binding<[String: Double]>, visible: Binding<Bool>,
           reduceMotion: Bool) async {

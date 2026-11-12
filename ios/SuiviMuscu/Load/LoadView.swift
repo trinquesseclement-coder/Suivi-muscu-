@@ -13,9 +13,6 @@ struct LoadView: View {
     /// `false` : moi ; `true` : l'autre.
     @State private var showPartner = Launch.partner
     @State private var together = Launch.together
-    /// Machine choisie, par personne, le temps de l'utilisation.
-    @State private var machineByPerson: [String: String] = [:]
-    @State private var measure = Launch.measure
 
     var body: some View {
         let now = Date()
@@ -26,9 +23,10 @@ struct LoadView: View {
         let byId = store.exerciseAnyById
         let weeks = LoadStats.weeks(sessions, ownerId: person.id, byId: byId, count: Self.weekCount,
                                     today: today, now: now)
-        let otherWeeks = together
-            ? LoadStats.weeks(sessions, ownerId: other.id, byId: byId, count: Self.weekCount, today: today, now: now)
-            : nil
+        let otherWeeks = LoadStats.weeks(sessions, ownerId: other.id, byId: byId, count: Self.weekCount,
+                                         today: today, now: now)
+        let personEmpty = weeks.allSatisfy { $0.sessions == 0 }
+        let otherEmpty = otherWeeks.allSatisfy { $0.sessions == 0 }
 
         ScrollViewReader { reader in
             ScrollView {
@@ -36,23 +34,28 @@ struct LoadView: View {
                     header
                     WhoPicker(options: [(false, "Moi"), (true, store.partner.name)], selection: $showPartner)
 
-                    if weeks.allSatisfy({ $0.sessions == 0 }) {
+                    if personEmpty && otherEmpty {
                         ChartCard(title: "Séances et heures par semaine",
-                                  empty: (.sessions, "Pas encore de séance ces 8 dernières semaines")) {
+                                  empty: (.sessions, Self.noSessionText)) {
                             EmptyView()
                         } table: { EmptyView() }
                     } else {
-                        sessionsCard(person: person, weeks: weeks, other: other, otherWeeks: otherWeeks)
-                        tonnageCard(person: person, weeks: weeks).id("tonnage")
-                        cardioCard(person: person, weeks: weeks)
-                        muscleCard(person: person, week: weeks.last).id("muscles")
+                        // Rien pour cette personne mais des séances pour l'autre : la carte des séances
+                        // reste là, vide, avec son interrupteur « Avec … » ; les cartes de kilos sautent.
+                        sessionsCard(person: person, weeks: weeks, other: other,
+                                     otherWeeks: together ? otherWeeks : nil, personEmpty: personEmpty)
+                        if !personEmpty {
+                            tonnageCard(person: person, weeks: weeks).id("tonnage")
+                            cardioCard(person: person, weeks: weeks)
+                            muscleCard(person: person, week: weeks.last).id("muscles")
+                        }
                     }
 
                     MachineProgressCard(person: person, sessions: sessions, byId: byId,
-                                        machine: Binding(get: { machineByPerson[person.id] ?? Launch.machine },
-                                                         set: { machineByPerson[person.id] = $0 }),
-                                        measure: $measure, startsWithTable: Launch.table == "progress")
-                        .id(person.id)
+                                        initialMachine: Launch.machine, initialMeasure: Launch.measure,
+                                        startsWithTable: Launch.table == "progress")
+                        // Ancre de défilement seulement : la carte garde son état (machine par personne,
+                        // mesure) quand on change de personne.
                         .id("progress")
                     RecordsTable(person: person, sessions: sessions, byId: byId).id("records")
                 }
@@ -80,10 +83,13 @@ struct LoadView: View {
         .padding(.bottom, 4)
     }
 
+    private static let noSessionText = "Pas encore de séance ces 8 dernières semaines"
+
     // MARK: Cartes
 
     /// Séances (barres) et heures (libellés). Seul graphique qui peut montrer les deux personnes.
-    private func sessionsCard(person: Profile, weeks: [WeekLoad], other: Profile, otherWeeks: [WeekLoad]?) -> some View {
+    private func sessionsCard(person: Profile, weeks: [WeekLoad], other: Profile, otherWeeks: [WeekLoad]?,
+                              personEmpty: Bool) -> some View {
         let both = otherWeeks != nil
         var series = [BarSeries(id: person.id, name: person.name, color: Theme.color(for: person),
                                 values: weeks.map { Double($0.sessions) },
@@ -96,10 +102,16 @@ struct LoadView: View {
         let maxSessions = Int(series.flatMap(\.values).max() ?? 0)
         let step = maxSessions > 4 ? 2 : 1
         let cell = { (w: WeekLoad) in "\(w.sessions) · \(Stats.formatHours(w.minutes))" }
-        let last = weeks.last
+        let spoken = { (p: Profile, w: WeekLoad?) -> String in
+            let n = w?.sessions ?? 0
+            return "\(p.name) \(n) séance\(n > 1 ? "s" : ""), \(Stats.formatHours(w?.minutes ?? 0))"
+        }
+        let summary = both ? "Cette semaine : \(spoken(person, weeks.last)) ; \(spoken(other, otherWeeks?.last))"
+                           : "Cette semaine : \(spoken(person, weeks.last))"
         return ChartCard(title: "Séances et heures par semaine",
                          subtitle: both ? "Séances de chacun ; les heures sont dans le tableau"
-                                        : "Les heures au-dessus de chaque barre",
+                                        : "Les barres comptent les séances, le chiffre au-dessus le temps passé",
+                         empty: personEmpty && !both ? (.sessions, Self.noSessionText) : nil,
                          startsWithTable: Launch.table == "sessions") {
             VStack(alignment: .leading, spacing: 8) {
                 Toggle(isOn: $together.animation(reduceMotion ? Motion.reduced : Motion.spring)) {
@@ -119,9 +131,7 @@ struct LoadView: View {
             WeekBarsChart(weeks: weeks.map(\.week), series: series, axisLabel: { "\(Int($0))" },
                           ticks: stride(from: 0, through: maxSessions, by: step).map(Double.init),
                           accessibilityTitle: "Séances et heures par semaine",
-                          accessibilitySummary: last.map {
-                              "Cette semaine : \($0.sessions) séance\($0.sessions > 1 ? "s" : ""), \(Stats.formatHours($0.minutes))"
-                          } ?? "")
+                          accessibilitySummary: summary)
         } table: {
             if let otherWeeks {
                 DataTable(head: ["Semaine", person.name, other.name],
@@ -175,7 +185,10 @@ struct LoadView: View {
             .map { (muscle: Catalogue.muscleLabel($0), sets: week?.setsByMuscle[$0] ?? 0) }
         return ChartCard(title: "Séries par muscle",
                          subtitle: "Cette semaine — repère : 10 à 20 séries par muscle et par semaine",
-                         empty: rows.isEmpty ? (.sessions, "Pas encore de séance cette semaine") : nil,
+                         // Une séance de cardio seul cette semaine : il y a eu séance, mais pas de série.
+                         empty: rows.isEmpty ? (.sessions, (week?.sessions ?? 0) == 0
+                                                ? "Pas encore de séance cette semaine"
+                                                : "Pas de série de muscu cette semaine") : nil,
                          startsWithTable: Launch.table == "muscles") {
             MuscleSetsChart(rows: rows, color: Theme.color(for: person), personId: person.id)
         } table: {

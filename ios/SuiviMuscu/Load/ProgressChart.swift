@@ -15,14 +15,15 @@ enum LoadMeasure: String, CaseIterable, Hashable {
     }
 }
 
-struct ProgressPoint: Equatable {
+struct ProgressPoint: Hashable {
     let date: String
     let value: Double
 }
 
 /// Courbe d'une machine pour une personne, avec ses points et la dernière valeur écrite.
-/// Elle se dessine de gauche à droite à l'apparition et au changement de personne ; changer de mesure
-/// ou de machine fait glisser la courbe vers les nouvelles valeurs.
+/// Elle se dessine de gauche à droite quand elle arrive à l'écran et au changement de personne ; changer
+/// de mesure ou de machine fait glisser la courbe vers les nouvelles valeurs (fondu enchaîné avec
+/// « Réduire les animations »).
 struct ProgressChart: View {
     let points: [ProgressPoint]
     let color: Color
@@ -42,9 +43,14 @@ struct ProgressChart: View {
         return max(0, lo - pad)...(hi + pad)
     }
 
-    /// Séances écrites sous l'axe : la première, celle du milieu et la dernière.
+    /// Séances dont la date est écrite sous l'axe : toutes jusqu'à 4 ; au-delà, au plus 4 dates à pas
+    /// constant, en partant de la dernière (5 points : 1re, 3e, 5e). À 390 pt, 4 dates tiennent sans
+    /// se toucher.
     private var labelled: Set<Int> {
-        points.count > 2 ? [0, points.count / 2, points.count - 1] : Set(points.indices)
+        let n = points.count
+        guard n > 4 else { return Set(points.indices) }
+        let step = (n - 1 + 2) / 3   // arrondi supérieur de (n - 1) / 3
+        return Set(stride(from: n - 1, through: 0, by: -step))
     }
 
     /// Une séance par cran, à intervalles réguliers (deux séances le même jour restent distinctes).
@@ -61,6 +67,31 @@ struct ProgressChart: View {
     }
 
     var body: some View {
+        ZStack {
+            // En mode réduit, changer de mesure ou de machine remplace la courbe par un fondu enchaîné.
+            chart.id(reduceMotion ? points : [])
+                .transition(.opacity)
+        }
+        .animation(reduceMotion ? Motion.reduced : Motion.spring, value: points)
+        .frame(height: height)
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        // Dessin de gauche à droite : un masque qui s'ouvre (fondu avec « Réduire les animations »).
+        .mask(alignment: .leading) {
+            GeometryReader { geo in
+                Rectangle().frame(width: reduceMotion ? geo.size.width : geo.size.width * reveal)
+            }
+        }
+        .opacity(reduceMotion ? reveal : 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityTitle)
+        .accessibilityValue(summary)
+        .chartEntrance(key: revealKey, reset: { reveal = 0 }) { reduce in
+            reveal = 0
+            withAnimation(reduce ? Motion.reduced : .easeOut(duration: 0.35)) { reveal = 1 }
+        }
+    }
+
+    private var chart: some View {
         Chart {
             ForEach(Array(points.enumerated()), id: \.offset) { i, p in
                 mark(i, p)
@@ -99,23 +130,6 @@ struct ProgressChart: View {
                 }
             }
         }
-        .frame(height: height)
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
-        .motion(Motion.spring, value: points)
-        // Dessin de gauche à droite : un masque qui s'ouvre (fondu avec « Réduire les animations »).
-        .mask(alignment: .leading) {
-            GeometryReader { geo in
-                Rectangle().frame(width: reduceMotion ? geo.size.width : geo.size.width * reveal)
-            }
-        }
-        .opacity(reduceMotion ? reveal : 1)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityTitle)
-        .accessibilityValue(summary)
-        .task(id: revealKey) {
-            reveal = 0
-            withAnimation(reduceMotion ? Motion.reduced : .easeOut(duration: 0.35)) { reveal = 1 }
-        }
     }
 
     private var summary: String {
@@ -131,13 +145,23 @@ struct MachineProgressCard: View {
     let person: Profile
     let sessions: [Session]
     let byId: [String: Exercise]
-    @Binding var machine: String?
-    @Binding var measure: LoadMeasure
     var startsWithTable = false
+
+    /// Machine choisie, par personne, le temps de l'utilisation ; mesure choisie. Gardées ici pour
+    /// que toucher une mesure ne recalcule que cette carte, pas toute la page.
+    @State private var machineByPerson: [String: String]
+    @State private var measure: LoadMeasure
+
+    init(person: Profile, sessions: [Session], byId: [String: Exercise], initialMachine: String? = nil,
+         initialMeasure: LoadMeasure = .top, startsWithTable: Bool = false) {
+        self.person = person; self.sessions = sessions; self.byId = byId; self.startsWithTable = startsWithTable
+        _machineByPerson = State(initialValue: initialMachine.map { [person.id: $0] } ?? [:])
+        _measure = State(initialValue: initialMeasure)
+    }
 
     var body: some View {
         let ids = LoadStats.doneExerciseIds(sessions, ownerId: person.id)
-        let selected = machine.flatMap { ids.contains($0) ? $0 : nil } ?? ids.first
+        let selected = machineByPerson[person.id].flatMap { ids.contains($0) ? $0 : nil } ?? ids.first
         if let selected, let exercise = byId[selected] {
             let data = series(for: exercise)
             ChartCard(title: "Progression par machine", startsWithTable: startsWithTable) {
@@ -166,7 +190,7 @@ struct MachineProgressCard: View {
 
     private func menu(ids: [String], selected: Exercise) -> some View {
         Menu {
-            Picker("Machine", selection: Binding(get: { selected.id }, set: { machine = $0 })) {
+            Picker("Machine", selection: Binding(get: { selected.id }, set: { machineByPerson[person.id] = $0 })) {
                 ForEach(ids, id: \.self) { id in
                     Text(byId[id]?.name ?? id).tag(id)
                 }

@@ -42,14 +42,20 @@ struct ChartCard<Accessory: View, Content: View, Table: View>: View {
             if let empty {
                 ChartEmpty(icon: empty.icon, text: empty.text)
             } else {
-                Group {
-                    if showTable { table } else { content }
+                // Le bouton (48 pt de haut) colle au graphique ; la marge basse de la carte est réduite
+                // d'autant, sa zone tactile faisant déjà office de marge.
+                VStack(alignment: .leading, spacing: 4) {
+                    Group {
+                        if showTable { table } else { content }
+                    }
+                    .transition(.opacity)
+                    toggleButton
                 }
-                .transition(.opacity)
-                toggleButton
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, empty == nil ? 6 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
     }
@@ -69,7 +75,6 @@ struct ChartCard<Accessory: View, Content: View, Table: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, -8)
     }
 }
 
@@ -194,5 +199,63 @@ struct LegendDot: View {
             Circle().fill(color).frame(width: 10, height: 10)
             Text(name).font(Theme.font(.footnote, weight: .semibold))
         }
+    }
+}
+
+/// Animation d'entrée d'un graphique, lancée quand il devient vraiment visible (son haut au-dessus
+/// de la barre d'onglets, voir `probeOffset`), une fois par jeu de données (`key` : personne, mesure,
+/// machine, valeurs). Si les données changent pendant qu'il est visible, l'animation repart aussitôt ;
+/// hors de l'écran, le graphique est remis à son état de départ (`reset`) et rejouera en revenant.
+/// Une animation interrompue (sortie de l'écran, changement rapide) n'est pas comptée comme jouée :
+/// le graphique finit toujours sur ses vraies valeurs.
+private struct ChartEntrance<Key: Equatable>: ViewModifier {
+    let key: Key
+    let reset: @MainActor () -> Void
+    let play: @MainActor (_ reduceMotion: Bool) async -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var onScreen = false
+    @State private var played: Key?
+
+    private struct Trigger: Equatable {
+        let key: Key
+        let onScreen: Bool
+    }
+
+    /// La page défile sous la barre d'onglets flottante (environ 100 pt avec son fondu) : un graphique
+    /// « dans » la vue défilante peut encore être caché derrière. On observe donc un point invisible
+    /// placé à cette distance sous le haut du graphique : quand il entre dans la vue, les 50 premiers
+    /// points du graphique sont au-dessus de la barre. Il y a toujours au moins cette hauteur de contenu
+    /// sous le haut d'un graphique (cartes « Progression » et « Records » en dessous), donc le point
+    /// finit toujours par entrer.
+    private static var probeOffset: CGFloat { 150 }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .top) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .onScrollVisibilityChange(threshold: 1) { onScreen = $0 }
+                    .padding(.top, Self.probeOffset)
+                    .fixedSize()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .onChange(of: key) {
+                if !onScreen { played = nil; reset() }
+            }
+            .task(id: Trigger(key: key, onScreen: onScreen)) {
+                guard onScreen, played != key else { return }
+                await play(reduceMotion)
+                if !Task.isCancelled { played = key }
+            }
+    }
+}
+
+extension View {
+    /// Voir `ChartEntrance` : partagé par les barres de semaines, les muscles et la courbe.
+    func chartEntrance<Key: Equatable>(key: Key, reset: @escaping @MainActor () -> Void,
+                                       play: @escaping @MainActor (_ reduceMotion: Bool) async -> Void) -> some View {
+        modifier(ChartEntrance(key: key, reset: reset, play: play))
     }
 }
