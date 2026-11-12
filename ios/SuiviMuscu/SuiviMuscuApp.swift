@@ -15,13 +15,16 @@ struct SuiviMuscuApp: App {
                                                 appropriateFor: nil, create: true))
             ?? FileManager.default.temporaryDirectory
         let url = dir.appendingPathComponent("suivi.json")
+        #if DEBUG
         let args = ProcessInfo.processInfo.arguments
+        // `-demo` n'existe qu'en DEBUG : un build installé sur le téléphone ne peut jamais écraser les vraies données.
         let store = args.contains("-demo")
             ? AppStore.demo(fileURL: url, today: Dates.isoDate(Date()), now: Date())
             : AppStore(fileURL: url)
-        #if DEBUG
-        // Voir l'appli comme Jules tant que les Réglages n'existent pas (tâche 10).
+        // Mise au point : voir l'appli comme Jules sans passer par les Réglages.
         if args.contains("-as-jules") { store.switchProfile(to: AppStore.julesId) }
+        #else
+        let store = AppStore(fileURL: url)
         #endif
         UNUserNotificationCenter.current().delegate = Self.notificationDelegate
         _store = State(initialValue: store)

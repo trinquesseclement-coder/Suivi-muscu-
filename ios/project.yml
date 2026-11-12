@@ -18,7 +18,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.suivimuscu.app
         PRODUCT_NAME: SuiviMuscu
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 5YNLG6QS4W
+        CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

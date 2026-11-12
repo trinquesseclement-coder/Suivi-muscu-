@@ -31,8 +31,7 @@ struct RootView: View {
     @State private var path: [SessionRoute] = []
     @Namespace private var zoom
 
-    /// Ouvre les Réglages depuis l'avatar, branché à la tâche 10.
-    var onSettings: () -> Void = {}
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -42,6 +41,7 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showSettings) { SettingsView() }
             .navigationDestination(for: SessionRoute.self) { route in
                 SessionView(sessionId: route.id, fresh: route.fresh) { id in
                     path = [SessionRoute(id: id, source: route.source)]
@@ -68,7 +68,7 @@ struct RootView: View {
         switch tab {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
-                     onAvatar: onSettings)
+                     onAvatar: { showSettings = true })
         case .planning, .load, .machines:
             Text("Bientôt").font(Theme.font(.title2, weight: .semibold)).foregroundStyle(.white)
         }
