@@ -28,18 +28,26 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab: AppTab = .home
     @State private var bounce = 0
+    @State private var path: [SessionRoute] = []
+    @Namespace private var zoom
 
-    /// Appelé par le bouton « + » (séance libre), branché à la tâche 8.
-    var onAdd: () -> Void = {}
-    /// Ouvre une séance par son id, branché à la tâche 8.
-    var onOpenSession: (String) -> Void = { _ in }
     /// Ouvre les Réglages depuis l'avatar, branché à la tâche 10.
     var onSettings: () -> Void = {}
 
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
-            content
+        NavigationStack(path: $path) {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                content
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: SessionRoute.self) { route in
+                SessionView(sessionId: route.id, fresh: route.fresh) { id in
+                    path = [SessionRoute(id: id, source: route.source)]
+                }
+                .navigationTransition(.zoom(sourceID: route.source, in: zoom))
+            }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if store.lastSaveError != nil {
@@ -52,17 +60,48 @@ struct RootView: View {
                     .accessibilityAddTraits(.isStaticText)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
         .sensoryFeedback(.selection, trigger: tab)
+        .task { openFromLaunchArguments() }
     }
 
     @ViewBuilder private var content: some View {
         switch tab {
         case .home:
-            HomeView(onOpenSession: onOpenSession, onFreeSession: onAdd, onAvatar: onSettings)
+            HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
+                     onAvatar: onSettings)
         case .planning, .load, .machines:
             Text("Bientôt").font(Theme.font(.title2, weight: .semibold)).foregroundStyle(.white)
         }
+    }
+
+    private func open(_ route: SessionRoute) {
+        path.append(route)
+    }
+
+    /// « + » ou « Séance libre » : une séance vide pour moi aujourd'hui, ouverte aussitôt.
+    private func startFreeSession(source: String) {
+        let now = Date()
+        let me = store.meId
+        let session = Session(id: UUID().uuidString.lowercased(), ownerId: me, createdBy: me,
+                              date: Dates.isoDate(now), title: "Séance", status: .planned, items: [],
+                              updatedAt: AppStore.timestamp(now))
+        store.saveSession(session)
+        path.append(SessionRoute(id: session.id, source: source, fresh: true))
+    }
+
+    /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
+    /// `-open-session <id>` ouvre une séance précise.
+    private func openFromLaunchArguments() {
+        #if DEBUG
+        guard path.isEmpty else { return }
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
+            path = [SessionRoute(id: args[i + 1], source: "launch")]
+        } else if args.contains("-open-next"),
+                  let s = HomeView.nextSession(store.sessions, meId: store.meId, now: Date()) {
+            path = [SessionRoute(id: s.id, source: "next")]
+        }
+        #endif
     }
 
     private var tabBar: some View {
@@ -108,7 +147,7 @@ struct RootView: View {
     }
 
     private var addButton: some View {
-        Button(action: onAdd) {
+        Button { startFreeSession(source: "add") } label: {
             AppIcon.add.image
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
@@ -116,6 +155,7 @@ struct RootView: View {
                 .background(Circle().fill(Theme.orange))
         }
         .buttonStyle(.plain)
+        .zoomSource("add", in: zoom)
         .accessibilityLabel("Séance libre")
     }
 }

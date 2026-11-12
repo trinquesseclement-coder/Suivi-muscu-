@@ -4,6 +4,7 @@ import SwiftUI
 enum AppIcon: String, CaseIterable {
     case home, planning, add, load, machines, settings, sessions, time, timer, trophy, goal
     case together, wheelchair, transfer, standing, help, plate, cardio, sync, offline, photo, pyramid, play
+    case back, more, check, close, minus, copy, rename, delete, classic
 
     var symbolName: String {
         switch self {
@@ -30,6 +31,15 @@ enum AppIcon: String, CaseIterable {
         case .photo: "camera"
         case .pyramid: "triangle"
         case .play: "play.fill"
+        case .back: "chevron.left"
+        case .more: "ellipsis"
+        case .check: "checkmark"
+        case .close: "xmark"
+        case .minus: "minus"
+        case .copy: "doc.on.doc"
+        case .rename: "pencil"
+        case .delete: "trash"
+        case .classic: "equal"
         }
     }
 

@@ -4,6 +4,9 @@ import SuiviCore
 /// Bandeau sombre « Prochaine séance » avec le bouton rond orange, ou « Séance libre ».
 struct NextSessionCard: View {
     let session: Session?
+    /// La séance est commencée : « Séance en cours », le bouton la reprend.
+    var live = false
+    var zoom: Namespace.ID? = nil
     let onOpen: () -> Void
     let onFree: () -> Void
 
@@ -13,7 +16,8 @@ struct NextSessionCard: View {
                 HStack(spacing: 12) {
                     playBadge
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Prochaine séance · \(Format.day(session.date, today: Dates.isoDate(Date())).lowercased())")
+                        Text(live ? "Séance en cours"
+                             : "Prochaine séance · \(Format.day(session.date, today: Dates.isoDate(Date())).lowercased())")
                             .font(Theme.font(.footnote))
                             .opacity(0.7)
                         Text(session.title)
@@ -23,9 +27,10 @@ struct NextSessionCard: View {
                     Spacer(minLength: 0)
                 }
                 .modifier(DarkBand())
+                .zoomSource("next", in: zoom)
             }
             .buttonStyle(PressableStyle())
-            .accessibilityHint("Ouvrir la séance")
+            .accessibilityHint(live ? "Reprendre la séance" : "Ouvrir la séance")
         } else {
             HStack(spacing: 12) {
                 Text("Aucune séance prévue")
@@ -40,6 +45,7 @@ struct NextSessionCard: View {
                     .padding(.horizontal, 16)
                     .frame(minHeight: Theme.minTouch)
                     .background(Capsule().fill(Theme.orange))
+                    .zoomSource("free", in: zoom)
                 }
                 .buttonStyle(PressableStyle())
             }

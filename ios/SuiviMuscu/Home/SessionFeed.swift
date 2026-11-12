@@ -4,7 +4,9 @@ import SuiviCore
 /// Fil « Activité récente », comme le web (`SessionCard.tsx`).
 struct SessionFeed: View {
     let sessions: [Session]
-    /// Branché à la tâche 8 (ouverture de la séance) ; sans lui, les cartes ne réagissent pas.
+    /// Espace de noms de la transition « zoom » vers la séance.
+    var zoom: Namespace.ID? = nil
+    /// Ouvre la séance touchée ; sans lui, les cartes ne réagissent pas.
     var onTap: ((Session) -> Void)? = nil
 
     @Environment(AppStore.self) private var store
@@ -40,7 +42,9 @@ struct SessionFeed: View {
                         today: today,
                         now: now)
                     if let onTap {
-                        Button { onTap(s) } label: { card }.buttonStyle(PressableStyle())
+                        Button { onTap(s) } label: { card.zoomSource("feed-\(s.id)", in: zoom) }
+                            .buttonStyle(PressableStyle())
+                            .accessibilityHint("Ouvrir la séance")
                     } else {
                         card
                     }
