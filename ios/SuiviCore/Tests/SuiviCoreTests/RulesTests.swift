@@ -46,6 +46,68 @@ import Testing
         #expect(it.sets.map(\.kg) == [0, 0, 0, 0])
     }
 
+    // MARK: Charges et façon de faire de la dernière fois
+
+    @Test func pyramidCarriesLoadsByPositionWhenNotAllValidated() {
+        let last = item([set(20, 12, true), set(25, 10, true), set(30, 8, true), set(22, 12, false)],
+                        scheme: .pyramid)
+        let it = Rules.newItem(Self.exo, ownerId: "p1",
+                               sessions: [doneSession("s1", items: [last])], scheme: .pyramid)
+        #expect(it.sets.map(\.kg) == [20, 25, 30, 22])
+        #expect(it.sets.map(\.reps) == [12, 10, 8, 12])
+        #expect(it.sets.allSatisfy { !$0.done })
+    }
+
+    @Test func pyramidTakesFirstFourOfFiveSets() {
+        let last = item([set(20, 12, true), set(25, 10, true), set(30, 8, true), set(22, 12, true),
+                         set(35, 6, true)], scheme: .pyramid)
+        let it = Rules.newItem(Self.exo, ownerId: "p1",
+                               sessions: [doneSession("s1", items: [last])], scheme: .pyramid)
+        #expect(it.sets.map(\.kg) == [20, 25, 30, 22])
+        #expect(it.sets.map(\.reps) == [12, 10, 8, 12])
+    }
+
+    @Test func pyramidFromThreeSetsRepeatsSet1() {
+        let last = item([set(20, 12, true), set(25, 10, true), set(30, 8, true)], scheme: .pyramid)
+        let it = Rules.newItem(Self.exo, ownerId: "p1",
+                               sessions: [doneSession("s1", items: [last])], scheme: .pyramid)
+        #expect(it.sets.map(\.kg) == [20, 25, 30, 20])
+        #expect(it.sets.map(\.reps) == [12, 10, 8, 12])
+    }
+
+    @Test func schemeFollowsLastTimeRecordedByTheApp() {
+        let clement = Profile(id: "p1", name: "Clément", slot: 1)
+        let last = item([set(50, 10, true), set(55, 8, true), set(60, 6, true)], scheme: .classic)
+        let history = [doneSession("s1", items: [last])]
+        let scheme = Rules.scheme(for: Self.exo, owner: clement, sessions: history)
+        #expect(scheme == .classic)
+        let it = Rules.newItem(Self.exo, ownerId: "p1", sessions: history, scheme: scheme)
+        #expect(it.scheme == .classic)
+        #expect(it.sets == [set(50, 10), set(55, 8), set(60, 6)])
+        // Et l'inverse : une pyramide la dernière fois pour un profil classique par défaut.
+        let jules = Profile(id: "p2", name: "Jules", slot: 2)
+        let pyr = item([set(20, 12, true), set(25, 10, true), set(30, 8, true), set(20, 12, true)], scheme: .pyramid)
+        #expect(Rules.scheme(for: Self.exo, owner: jules, sessions: [doneSession("s2", owner: "p2", items: [pyr])])
+                == .pyramid)
+    }
+
+    /// Transition documentée : un élément de l'ère web (sans schéma) ne dit pas la façon de faire,
+    /// on prend le réglage du profil ; une pyramide repart alors de 0 kg.
+    @Test func schemeFallsBackToProfileDefaultForWebEraItem() {
+        let clement = Profile(id: "p1", name: "Clément", slot: 1)
+        let last = item([set(50, 10, true), set(55, 8, true), set(60, 6, true)], scheme: nil)
+        let history = [doneSession("s1", items: [last])]
+        let scheme = Rules.scheme(for: Self.exo, owner: clement, sessions: history)
+        #expect(scheme == .pyramid)
+        let it = Rules.newItem(Self.exo, ownerId: "p1", sessions: history, scheme: scheme)
+        #expect(it.scheme == .pyramid)
+        #expect(it.sets.map(\.kg) == [0, 0, 0, 0])
+        // Sans historique : le réglage du profil.
+        #expect(Rules.scheme(for: Self.exo, owner: clement, sessions: []) == .pyramid)
+        #expect(Rules.scheme(for: Self.exo, owner: Profile(id: "p2", name: "Jules", slot: 2), sessions: [])
+                == .classic)
+    }
+
     @Test func classicNewItemFromLastTimeAndDefault() {
         let last = item([set(40, 10, true), set(45, 8, true), set(50, 6, false)])
         let it = Rules.newItem(Self.exo, ownerId: "p1",

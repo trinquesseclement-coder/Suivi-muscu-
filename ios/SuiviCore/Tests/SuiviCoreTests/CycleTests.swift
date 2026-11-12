@@ -68,6 +68,31 @@ import Testing
         #expect(next(history, owner: AppStore.julesId) == "cycle-pecs-bras")
     }
 
+    @Test func sameDayOrderUsesStartNotLastEdit() {
+        var morning = cycled("cycle-pecs-bras", date: "2026-11-12")
+        morning.startedAt = "2026-11-12T08:00:00.000Z"
+        var afternoon = cycled("cycle-cardio", date: "2026-11-12")
+        afternoon.startedAt = "2026-11-12T15:00:00.000Z"
+        afternoon.updatedAt = "2026-11-12T16:00:00.000Z"
+        // Une charge corrigée le soir dans la séance du matin : elle devient la plus récemment modifiée.
+        morning.updatedAt = "2026-11-12T20:00:00.000Z"
+        for order in [[morning, afternoon], [afternoon, morning]] {
+            #expect(CyclePlanner.last(Self.standard, sessions: order, ownerId: AppStore.clementId)?.id
+                    == "cycle-cardio")
+            #expect(next(order) == "cycle-epaules-dos")
+        }
+    }
+
+    @Test func startedWithoutValidatedSetDoesNotAdvance() {
+        var started = cycled("cycle-pecs-bras", date: "2026-11-12", done: false)
+        started.status = .done
+        started.startedAt = "2026-11-12T08:00:00.000Z"
+        let history = [started, cycled("cycle-epaules-dos", date: "2026-11-10")]
+        #expect(CyclePlanner.last(Self.standard, sessions: history, ownerId: AppStore.clementId)?.id
+                == "cycle-epaules-dos")
+        #expect(next(history) == "cycle-pecs-bras")
+    }
+
     @Test func removedTemplateIsIgnored() {
         let history = [cycled("cycle-ancien", date: "2026-11-12"), cycled("cycle-epaules-dos", date: "2026-11-10")]
         #expect(CyclePlanner.last(Self.standard, sessions: history, ownerId: AppStore.clementId)?.id
@@ -159,6 +184,34 @@ import Testing
         #expect(!j.sets.contains { [20, 25, 30].contains($0.kg) })
     }
 
+    @Test func classicHistoryIsCopiedSetBySetWhateverTheTarget() throws {
+        // Clément (pyramide par défaut) a fait le chest press en classique dans l'appli.
+        let past = [history("sc", owner: Self.clement.id, scheme: .classic, sets: [(50, 10), (55, 8), (60, 6)])]
+        let alone = try #require(build("cycle-pecs-bras", target: .me, sessions: past).first)
+        let together = try #require(build("cycle-pecs-bras", target: .both, sessions: past)
+            .first { $0.ownerId == Self.clement.id })
+        let item = try #require(alone.items.first { $0.exerciseId == "m-chest-press" })
+        #expect(item.scheme == .classic)
+        #expect(item.sets == [SetEntry(kg: 50, reps: 10, done: false), SetEntry(kg: 55, reps: 8, done: false),
+                              SetEntry(kg: 60, reps: 6, done: false)])
+        func withoutIds(_ s: Session) -> [SessionItem] {
+            s.items.map { var i = $0; i.id = ""; return i }
+        }
+        #expect(withoutIds(alone) == withoutIds(together))
+    }
+
+    @Test func pyramidHistoryCarriesLoadsByPositionInCycle() throws {
+        var past = history("sc", owner: Self.clement.id, scheme: .pyramid, sets: [(20, 12), (25, 10), (30, 8), (22, 12)])
+        past.items[0].sets[3].done = false
+        for target in [PlanTarget.me, .both] {
+            let mine = try #require(build("cycle-pecs-bras", target: target, sessions: [past])
+                .first { $0.ownerId == Self.clement.id })
+            let item = try #require(mine.items.first { $0.exerciseId == "m-chest-press" })
+            #expect(item.scheme == .pyramid)
+            #expect(item.sets.map(\.kg) == [20, 25, 30, 22])
+        }
+    }
+
     @Test func singleTargetBuildsOneSession() {
         let out = build("cycle-epaules-dos", target: .me)
         #expect(out.count == 1)
@@ -209,5 +262,34 @@ import Testing
         let tagged = cycled("cycle-cardio", date: "2026-11-10")
         let back = try JSONDecoder().decode(Session.self, from: JSONEncoder().encode(tagged))
         #expect(back.cycleId == "cycle-cardio")
+    }
+
+    // MARK: Séances prévues jamais commencées
+
+    @Test func staleSessionsSelectsOnlyUntouchedPastCycleSessions() {
+        let today = "2026-11-13"
+        func planned(_ id: String, owner: String = AppStore.julesId, date: String = "2026-11-12",
+                     cycleId: String? = "cycle-pecs-bras") -> Session {
+            var s = cycled(cycleId, owner: owner, date: date, done: false)
+            s.id = id
+            return s
+        }
+        let stale = planned("stale")
+        let todays = planned("today", date: today)
+        var started = planned("started")
+        started.startedAt = "2026-11-12T08:00:00.000Z"
+        var withSet = planned("with-set")
+        withSet.items[0].sets[0].done = true
+        let free = planned("free", cycleId: nil)
+        let other = planned("other", owner: AppStore.clementId)
+        var deleted = planned("deleted")
+        deleted.deleted = true
+        var done = planned("done")
+        done.status = .done
+        let all = [stale, todays, started, withSet, free, other, deleted, done]
+        #expect(CyclePlanner.staleSessions(all, ownerIds: [AppStore.julesId], today: today).map(\.id) == ["stale"])
+        #expect(Set(CyclePlanner.staleSessions(all, ownerIds: [AppStore.julesId, AppStore.clementId], today: today)
+            .map(\.id)) == ["stale", "other"])
+        #expect(CyclePlanner.staleSessions(all, ownerIds: [], today: today).isEmpty)
     }
 }

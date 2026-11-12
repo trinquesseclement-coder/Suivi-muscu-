@@ -37,7 +37,7 @@ public enum PlanBuilder {
             guard let b = best else { return s }
             return s.kg > b.kg ? s : b
         }
-        return PlanSpec(id: id, exerciseId: ex.id, scheme: Rules.defaultScheme(for: owner),
+        return PlanSpec(id: id, exerciseId: ex.id, scheme: Rules.scheme(for: ex, owner: owner, sessions: sessions),
                         sets: done.count > 0 ? done.count : 3, reps: top?.reps ?? 10, kg: top?.kg ?? 0,
                         minutes: last?.item.cardio?.minutes ?? (ex.kind == .cardio ? 15 : 0))
     }
@@ -99,7 +99,8 @@ public enum PlanBuilder {
                 let sets = (0..<max(0, sp.sets)).map { _ in SetEntry(kg: sp.kg, reps: sp.reps, done: false) }
                 return SessionItem(id: UUID().uuidString.lowercased(), exerciseId: ex.id, sets: sets, scheme: .classic)
             }
-            return Rules.newItem(ex, ownerId: owner.id, sessions: sessions, scheme: Rules.defaultScheme(for: owner))
+            return Rules.newItem(ex, ownerId: owner.id, sessions: sessions,
+                                 scheme: Rules.scheme(for: ex, owner: owner, sessions: sessions))
         }
     }
 
@@ -115,12 +116,18 @@ public enum PlanBuilder {
         case .both: owners = [me, partner]
         }
         let single = owners.count == 1
-        let groupId = single ? nil : UUID().uuidString.lowercased()
-        let trimmedNotes = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stamp = AppStore.timestamp(now)
         let built = owners.map { owner in
             (owner, items(from: specs, owner: owner, single: single, sessions: sessions, byId: byId))
         }
+        return assemble(built, me: me, date: date, title: title, notes: notes, byId: byId, now: now)
+    }
+
+    /// Séances prévues, une par propriétaire avec ses éléments ; un `groupId` commun s'il y en a deux.
+    static func assemble(_ built: [(Profile, [SessionItem])], me: Profile, date: String, title: String,
+                         notes: String?, byId: [String: Exercise], now: Date) -> [Session] {
+        let groupId = built.count > 1 ? UUID().uuidString.lowercased() : nil
+        let trimmedNotes = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stamp = AppStore.timestamp(now)
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalTitle = trimmedTitle.isEmpty
             ? Rules.titleSuggestion(built.first?.1 ?? [], byId: byId) : trimmedTitle
