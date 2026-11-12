@@ -64,13 +64,18 @@ public struct PR: Sendable, Equatable {
 /// `personalRecords` de `appli/src/lib/stats.ts`). Chaque fonction ne regarde qu'une personne :
 /// les charges de deux personnes ne sont jamais mélangées.
 public enum LoadStats {
-    /// Séances terminées, non supprimées, de cette personne.
+    /// Séances terminées, non supprimées, de cette personne. Historiques, records et machines faites
+    /// ne lisent que celles-ci (comme `Stats.lastPerformance`), contrairement à `weeks`.
     private static func finished(_ sessions: [Session], ownerId: String) -> [Session] {
         sessions.filter { $0.ownerId == ownerId && $0.status == .done && $0.deleted != true }
     }
 
-    /// `count` semaines, de la plus ancienne à celle d'aujourd'hui. Les séances et les minutes suivent
-    /// `Stats.counts` et `Stats.durationMinutes` (comme l'accueil), pas les règles du web.
+    /// `count` semaines, de la plus ancienne à celle d'aujourd'hui.
+    /// Écart voulu avec `weeklyStats` du web : tous les champs d'une semaine (séances, minutes, tonnage,
+    /// séries, cardio, muscles) suivent `Stats.counts` et `Stats.durationMinutes`, sans filtre sur `status`.
+    /// Une série validée compte même si la séance n'a jamais été terminée : les graphiques d'une semaine
+    /// restent cohérents entre eux et avec l'accueil, et un oubli de « Terminer » n'affiche pas
+    /// « 1 séance, 0 kg ».
     public static func weeks(_ sessions: [Session], ownerId: String, byId: [String: Exercise],
                              count: Int, today: String, now: Date) -> [WeekLoad] {
         guard count > 0 else { return [] }
@@ -132,9 +137,8 @@ public enum LoadStats {
             for it in s.items {
                 for st in Stats.doneSets(it) {
                     let v = Stats.e1rm(kg: st.kg, reps: st.reps)
-                    if let cur = prs[it.exerciseId], !(v > cur.e1rm || (v == cur.e1rm && s.date < cur.date)) {
-                        continue
-                    }
+                    let better = prs[it.exerciseId].map { v > $0.e1rm || (v == $0.e1rm && s.date < $0.date) } ?? true
+                    guard better else { continue }
                     prs[it.exerciseId] = PR(exerciseId: it.exerciseId, kg: st.kg, reps: st.reps, e1rm: v, date: s.date)
                 }
             }

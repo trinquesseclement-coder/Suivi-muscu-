@@ -142,4 +142,22 @@ import Testing
         let s = session("a", date: "2026-11-12", items: [cardio])
         #expect(LoadStats.doneExerciseIds([s], ownerId: "p1") == ["c-bike"])
     }
+
+    @Test func weeksCountValidatedSetsOfUnfinishedSession() {
+        let s = session("a", items: [item("m-chest-press", [(40, 10), (40, 10)])], status: .planned)
+        let cur = LoadStats.weeks([s], ownerId: "p1", byId: byId, count: 8, today: Self.today, now: Self.now)[7]
+        #expect(cur.sessions == 1)
+        #expect(cur.tonnage == 800)
+        #expect(cur.sets == 2)
+        #expect(cur.setsByMuscle[.pecs] == 2)
+        #expect(LoadStats.history([s], ownerId: "p1", exerciseId: "m-chest-press").isEmpty)
+        #expect(LoadStats.records([s], ownerId: "p1").isEmpty)
+    }
+
+    @Test func e1rmRepCapAtTwelveFlowsIntoHistoryAndRecords() {
+        let s = session("a", items: [item("m-row", [(40, 20)])])
+        let expected = 40 * (1 + 12.0 / 30)
+        #expect(LoadStats.history([s], ownerId: "p1", exerciseId: "m-row")[0].e1rm == expected)
+        #expect(LoadStats.records([s], ownerId: "p1")["m-row"]?.e1rm == expected)
+    }
 }
