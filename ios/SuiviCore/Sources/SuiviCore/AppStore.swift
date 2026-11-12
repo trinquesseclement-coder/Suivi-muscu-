@@ -29,6 +29,11 @@ public final class AppStore {
     public private(set) var meId: String
     /// Description de la dernière erreur d'écriture, `nil` si la dernière écriture a réussi.
     public private(set) var lastSaveError: String?
+    /// Problème rencontré au chargement (texte français), `nil` si le fichier a été lu normalement.
+    /// Tant qu'il est posé après une lecture impossible, les écritures sont bloquées.
+    public private(set) var loadProblem: String?
+    /// Vrai quand écrire risquerait d'écraser un fichier existant qu'on n'a pas pu lire ni mettre de côté.
+    @ObservationIgnored private var writesBlocked = false
     @ObservationIgnored private static let log = Logger(subsystem: "fr.suivimuscu.app", category: "AppStore")
 
     // MARK: Lecture
@@ -85,7 +90,14 @@ public final class AppStore {
         load()
     }
 
-    /// Démarre avec les données de démonstration (écrase le contenu du fichier).
+    /// Fichier de démonstration, à côté du vrai fichier : `suivi.json` → `suivi-demo.json`.
+    /// Le mode démo ne doit jamais toucher le vrai fichier.
+    public nonisolated static func demoFileURL(besides realFile: URL) -> URL {
+        realFile.deletingLastPathComponent().appendingPathComponent("suivi-demo.json")
+    }
+
+    /// Démarre avec les données de démonstration (écrase le contenu de `fileURL`, qui doit être
+    /// un fichier de démo, voir `demoFileURL(besides:)`, jamais le vrai `suivi.json`).
     public static func demo(fileURL: URL, today: String, now: Date) -> AppStore {
         let store = AppStore(fileURL: fileURL)
         let d = DemoData.cache(today: today, now: now)
@@ -148,8 +160,18 @@ public final class AppStore {
 
     private func load() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        let data: Data
         do {
-            let data = try Data(contentsOf: fileURL)
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            // Lecture impossible (protection des données avant le premier déverrouillage, erreur disque…) :
+            // le fichier reste en place, on ne l'écrasera pas.
+            writesBlocked = true
+            loadProblem = "Données inaccessibles pour l'instant : rien n'a été modifié."
+            Self.log.error("Lecture impossible : \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        do {
             let file = try JSONDecoder().decode(StoreFile.self, from: data)
             profileMap = file.profiles
             for p in Self.defaultProfiles where profileMap[p.id] == nil { profileMap[p.id] = p }
@@ -157,14 +179,40 @@ public final class AppStore {
             overrides = file.exercises
             meId = profileMap[file.meId] != nil ? file.meId : Self.clementId
         } catch {
-            // Fichier illisible : on garde une copie `.corrupt` et on repart de zéro.
-            let backup = fileURL.appendingPathExtension("corrupt")
-            try? FileManager.default.removeItem(at: backup)
-            try? FileManager.default.moveItem(at: fileURL, to: backup)
+            // Contenu illisible : copie datée à côté (les anciennes copies ne sont jamais supprimées).
+            loadProblem = "Données illisibles : une copie a été gardée sur le téléphone."
+            Self.log.error("Décodage impossible : \(error.localizedDescription, privacy: .public)")
+            do {
+                try FileManager.default.moveItem(at: fileURL, to: Self.backupURL(for: fileURL, now: Date()))
+            } catch {
+                // Impossible de mettre le fichier de côté : on ne l'écrase pas.
+                writesBlocked = true
+                Self.log.error("Copie impossible : \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
+    /// `suivi.json` → `suivi.json.corrupt-20261112-183000` (UTC), suffixe numérique si le nom existe déjà.
+    nonisolated static func backupURL(for url: URL, now: Date) -> URL {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        let base = url.appendingPathExtension("corrupt-\(f.string(from: now))")
+        var candidate = base
+        var n = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = URL(fileURLWithPath: base.path + "-\(n)")
+            n += 1
+        }
+        return candidate
+    }
+
     private func persist() {
+        if writesBlocked {
+            lastSaveError = "Écriture bloquée : le fichier existant n'a pas pu être lu."
+            return
+        }
         do {
             let file = StoreFile(profiles: profileMap, sessions: sessionMap, exercises: overrides, meId: meId)
             let encoder = JSONEncoder()

@@ -137,4 +137,21 @@ import Testing
         #expect(!Stats.isRecord(SetEntry(kg: 40, reps: 10, done: true), best: best))
         #expect(!Stats.isRecord(SetEntry(kg: 45, reps: 10, done: true), best: 0))
     }
+
+    @Test func finishPrefillUsesNowWhenNotEnded() {
+        let now = Rules.parseTimestamp("2026-11-12T11:00:00.000Z")!
+        var s = Session(id: "s", ownerId: "local-clement", createdBy: "local-clement", date: "2026-11-12",
+                        title: "T", status: .done,
+                        items: [SessionItem(id: "i", exerciseId: "m-chest-press", sets: [SetEntry(kg: 40, reps: 10, done: true)])],
+                        updatedAt: "2026-11-12T10:05:00.000Z")
+        s.startedAt = "2026-11-12T10:00:00.000Z"
+        #expect(Stats.finishPrefillMinutes(s, now: now) == 60)
+        s.endedAt = "2026-11-12T10:44:00.000Z"
+        #expect(Stats.finishPrefillMinutes(s, now: now) == 45)
+        s.endedAt = nil
+        s.startedAt = "2026-11-12T01:00:00.000Z"
+        #expect(Stats.finishPrefillMinutes(s, now: now) == 240)
+        s.durationMin = 33
+        #expect(Stats.finishPrefillMinutes(s, now: now) == 33)
+    }
 }

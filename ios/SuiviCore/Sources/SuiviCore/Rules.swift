@@ -96,6 +96,8 @@ public enum Rules {
             for i in out.sets.indices where !out.sets[i].done && i < reps.count {
                 out.sets[i].reps = reps[i]
             }
+            // La série 4 revient à la charge de la série 1.
+            if out.sets.count >= 4, !out.sets[3].done, let first = out.sets.first { out.sets[3].kg = first.kg }
         case .classic:
             guard let ref = out.sets.last(where: \.done) ?? out.sets.first else { return out }
             for i in out.sets.indices where !out.sets[i].done {

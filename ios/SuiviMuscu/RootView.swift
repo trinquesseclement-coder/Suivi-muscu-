@@ -50,18 +50,25 @@ struct RootView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if store.lastSaveError != nil {
-                Text("Enregistrement impossible sur le téléphone")
-                    .font(Theme.font(.footnote, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.red.opacity(0.85))
-                    .accessibilityAddTraits(.isStaticText)
+            VStack(spacing: 0) {
+                if let problem = store.loadProblem { banner(problem) }
+                if store.lastSaveError != nil { banner("Enregistrement impossible sur le téléphone") }
             }
         }
         .sensoryFeedback(.selection, trigger: tab)
         .task { openFromLaunchArguments() }
+    }
+
+    private func banner(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.font(.footnote, weight: .semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .background(Color.red.opacity(0.85))
+            .accessibilityAddTraits(.isStaticText)
     }
 
     @ViewBuilder private var content: some View {

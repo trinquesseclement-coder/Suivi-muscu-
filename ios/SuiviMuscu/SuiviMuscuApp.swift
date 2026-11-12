@@ -17,9 +17,9 @@ struct SuiviMuscuApp: App {
         let url = dir.appendingPathComponent("suivi.json")
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
-        // `-demo` n'existe qu'en DEBUG : un build installé sur le téléphone ne peut jamais écraser les vraies données.
+        // `-demo` n'existe qu'en DEBUG et n'écrit que dans `suivi-demo.json` : jamais dans les vraies données.
         let store = args.contains("-demo")
-            ? AppStore.demo(fileURL: url, today: Dates.isoDate(Date()), now: Date())
+            ? AppStore.demo(fileURL: AppStore.demoFileURL(besides: url), today: Dates.isoDate(Date()), now: Date())
             : AppStore(fileURL: url)
         // Mise au point : voir l'appli comme Jules sans passer par les Réglages.
         if args.contains("-as-jules") { store.switchProfile(to: AppStore.julesId) }

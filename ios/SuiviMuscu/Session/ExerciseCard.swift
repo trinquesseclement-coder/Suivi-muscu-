@@ -130,7 +130,7 @@ struct ExerciseCard: View {
             if let lvl = c?.level, lvl > 0 { parts.append("niv. \(lvl)") }
             detail = parts.joined(separator: " · ")
         } else {
-            detail = Stats.doneSets(last.item).map { "\(Format.number($0.kg))×\($0.reps)" }.joined(separator: " · ")
+            detail = Stats.doneSets(last.item).map { "\(Format.load($0.kg))×\($0.reps)" }.joined(separator: " · ")
         }
         return "Dernière fois (\(Format.dayMonth(last.session.date))) : \(detail)"
     }

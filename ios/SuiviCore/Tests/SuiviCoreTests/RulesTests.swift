@@ -154,6 +154,16 @@ import Testing
         #expect(Rules.switchScheme(long, to: .pyramid).sets.count == 4)
     }
 
+    @Test func switchToPyramidSet4ReturnsToSet1Load() {
+        let padded = item([set(20, 12, true), set(25, 10, true), set(30, 8, true)], scheme: .classic)
+        let p = Rules.switchScheme(padded, to: .pyramid)
+        #expect(p.sets.count == 4)
+        #expect(p.sets[3].kg == 20)
+        #expect(p.sets[3].reps == 12)
+        let undone = item([set(20, 12), set(25, 10), set(30, 8), set(35, 12)], scheme: .classic)
+        #expect(Rules.switchScheme(undone, to: .pyramid).sets[3].kg == 20)
+    }
+
     @Test func defaultSchemeFollowsSlotAndSettings() {
         #expect(Rules.defaultScheme(for: Profile(id: "p1", name: "Clément", slot: 1)) == .pyramid)
         #expect(Rules.defaultScheme(for: Profile(id: "p2", name: "Jules", slot: 2)) == .classic)

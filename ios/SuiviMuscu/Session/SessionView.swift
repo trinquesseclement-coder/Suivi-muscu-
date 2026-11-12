@@ -61,7 +61,7 @@ struct SessionView: View {
         let helper = Rules.helperName(store.profiles)
         let helped = Rules.needsHelp(store.profiles, id: s.ownerId)
         let progress = Rules.hasProgress(s)
-        let keepAwake = s.startedAt != nil && s.endedAt == nil
+        let keepAwake = editable && Rules.isLive(s)
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {

@@ -92,15 +92,93 @@ struct StoreTests {
         #expect(store.sessions.map(\.id) == ["b", "a"])
     }
 
-    @Test func corruptFileStartsFreshAndKeepsBackup() throws {
+    func backups(of url: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: url.deletingLastPathComponent(),
+                                                    includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("suivi.json.corrupt-") }
+    }
+
+    @Test func corruptFileStartsFreshAndKeepsTimestampedBackup() throws {
         let url = tempFile()
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let dir = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Une copie plus ancienne ne doit jamais être supprimée.
+        let older = dir.appendingPathComponent("suivi.json.corrupt-20200101-000000")
+        try Data("ancienne copie".utf8).write(to: older)
         try Data("pas du json {".utf8).write(to: url)
         let store = AppStore(fileURL: url)
         #expect(store.profiles.count == 2)
-        let backup = url.appendingPathExtension("corrupt")
-        #expect(FileManager.default.fileExists(atPath: backup.path))
-        #expect(try Data(contentsOf: backup) == Data("pas du json {".utf8))
+        #expect(store.sessions.isEmpty)
+        #expect(store.loadProblem == "Données illisibles : une copie a été gardée sur le téléphone.")
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        let found = try backups(of: url)
+        #expect(found.count == 2)
+        #expect(try Data(contentsOf: older) == Data("ancienne copie".utf8))
+        let fresh = try #require(found.first { $0 != older })
+        #expect(try Data(contentsOf: fresh) == Data("pas du json {".utf8))
+        // Après une copie réussie, on peut écrire normalement.
+        store.saveSession(makeSession())
+        #expect(store.lastSaveError == nil)
+        #expect(AppStore(fileURL: url).sessions.count == 1)
+    }
+
+    @Test func secondCorruptionSameSecondKeepsBothBackups() throws {
+        let url = tempFile()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let now = Date()
+        let first = AppStore.backupURL(for: url, now: now)
+        try Data("a".utf8).write(to: first)
+        let second = AppStore.backupURL(for: url, now: now)
+        #expect(second != first)
+    }
+
+    @Test func unreadableFileIsLeftAloneAndWritesAreBlocked() throws {
+        let url = tempFile()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = try JSONEncoder().encode(StoreFile(
+            profiles: Dictionary(uniqueKeysWithValues: AppStore.defaultProfiles.map { ($0.id, $0) }),
+            sessions: ["s1": makeSession()], exercises: [:], meId: AppStore.clementId))
+        try original.write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path) }
+
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == "Données inaccessibles pour l'instant : rien n'a été modifié.")
+        #expect(store.sessions.isEmpty)
+        #expect(try backups(of: url).isEmpty)
+
+        store.saveSession(makeSession(id: "s2"))
+        #expect(store.lastSaveError != nil)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        #expect(try Data(contentsOf: url) == original)
+    }
+
+    @Test func unreadablePathIsNotMovedNorOverwritten() throws {
+        // Un dossier à la place du fichier : la lecture échoue, rien ne doit bouger.
+        let url = tempFile()
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem != nil)
+        store.saveSession(makeSession())
+        #expect(store.lastSaveError != nil)
+        var isDir: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue)
+        #expect(try backups(of: url).isEmpty)
+    }
+
+    @Test func demoNeverTouchesTheRealFile() throws {
+        let real = tempFile()
+        try FileManager.default.createDirectory(at: real.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let bytes = Data("{\"vraies\": \"données\"}".utf8)
+        try bytes.write(to: real)
+        let demoURL = AppStore.demoFileURL(besides: real)
+        #expect(demoURL != real)
+        #expect(demoURL.deletingLastPathComponent() == real.deletingLastPathComponent())
+        let now = Date()
+        let store = AppStore.demo(fileURL: demoURL, today: Dates.isoDate(now), now: now)
+        #expect(!store.sessions.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: demoURL.path))
+        #expect(try Data(contentsOf: real) == bytes)
     }
 
     @Test func writeFailureIsSurfaced() throws {

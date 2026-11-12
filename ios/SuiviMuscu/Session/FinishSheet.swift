@@ -14,10 +14,8 @@ struct FinishSheet: View {
     init(session: Session, onSave: @escaping (_ durationMin: Int, _ rpe: Int?, _ notes: String?) -> Void) {
         self.session = session
         self.onSave = onSave
-        let measured = Stats.durationMinutes(session, now: Date())
-        // Durée saisie gardée telle quelle ; durée mesurée arrondie aux 5 minutes.
-        let value = session.durationMin ?? Int((Double(measured) / 5).rounded()) * 5
-        _duration = State(initialValue: Double(min(240, max(5, value))))
+        // Durée saisie gardée telle quelle ; sinon début → maintenant, arrondi aux 5 minutes.
+        _duration = State(initialValue: Double(Stats.finishPrefillMinutes(session, now: Date())))
         _rpe = State(initialValue: session.rpe)
         _notes = State(initialValue: session.notes ?? "")
     }

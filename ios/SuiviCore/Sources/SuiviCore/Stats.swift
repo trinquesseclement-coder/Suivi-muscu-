@@ -109,6 +109,16 @@ public enum Stats {
         return max(0, min(minutes, 150))
     }
 
+    /// Durée proposée à l'écran « Terminer » : saisie si elle existe, sinon début → fin (ou → maintenant
+    /// si la séance n'est pas terminée), plafonnée à 240 et arrondie à 5 minutes (minimum 5).
+    public static func finishPrefillMinutes(_ s: Session, now: Date) -> Int {
+        if let typed = s.durationMin { return max(5, min(typed, 240)) }
+        guard let started = s.startedAt, let start = Rules.parseTimestamp(started) else { return 5 }
+        let end = s.endedAt.flatMap(Rules.parseTimestamp) ?? now
+        let minutes = max(0, end.timeIntervalSince(start) / 60)
+        return max(5, min(240, Int((minutes / 5).rounded()) * 5))
+    }
+
     private static func countingSessions(_ sessions: [Session], ownerId: String, containing iso: String) -> [Session] {
         let monday = Dates.weekStart(iso)
         return sessions.filter {
