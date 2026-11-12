@@ -19,8 +19,9 @@ struct SetRow: View {
     private var number: Int { index + 1 }
 
     var body: some View {
-        // Largeur à 375 pt : 375 − 2×12 (page) − 2×8 (ligne) = 335 ; − 14 (n°) − 56 (coche) − 3×4 = 253,
-        // soit 126,5 pt par stepper : 2 boutons de 48 pt et 30,5 pt pour le chiffre.
+        // Largeur à 390 pt (iPhone 14) : 390 − 2×16 (page) − 2×8 (ligne) = 342 ; − 14 (n°) − 52 (coche)
+        // − 3×4 = 264, soit 132 pt par stepper : 2 boutons de 48 pt et 36 pt pour le chiffre.
+        // À 375 pt : 124,5 pt par stepper, 28,5 pt pour le chiffre (il rétrécit).
         HStack(spacing: 4) {
             Text("\(number)")
                 .font(Theme.font(.headline, weight: .semibold))
@@ -46,10 +47,10 @@ struct SetRow: View {
     private var checkButton: some View {
         Button(action: onToggle) {
             (isRecord ? AppIcon.trophy : AppIcon.check).image
-                .font(.system(size: 22, weight: .bold))
+                .font(Theme.icon(22, weight: .bold))
                 .foregroundStyle(entry.done ? Color.white : Theme.ink.opacity(0.55))
                 .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? false : entry.done)
-                .frame(width: 56, height: 56)
+                .frame(width: 52, height: 52)
                 .background(Circle().fill(entry.done ? Theme.ink : Color.white.opacity(0.75)))
                 .overlay(Circle().strokeBorder(Theme.ink.opacity(entry.done ? 0 : 0.28), lineWidth: 1.5))
                 .contentShape(Circle())

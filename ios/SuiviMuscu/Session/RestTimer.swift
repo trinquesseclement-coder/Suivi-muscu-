@@ -185,7 +185,7 @@ struct RestTimer: View {
             .accessibilityLabel("Ajouter 30 secondes")
             Button { model.stop() } label: {
                 AppIcon.close.image
-                    .font(.system(size: 16, weight: .bold))
+                    .font(Theme.icon(16, weight: .bold))
                     .foregroundStyle(Theme.ink)
                     .frame(width: Theme.minTouch, height: Theme.minTouch)
                     .background(Circle().fill(Theme.ink.opacity(0.08)))
@@ -201,7 +201,7 @@ struct RestTimer: View {
         .fixedSize(horizontal: true, vertical: false)
         .sensoryFeedback(.warning, trigger: model.finishCount)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(done ? "Repos terminé" : "Repos, \(Self.spoken(left)) restantes")
+        .accessibilityLabel(done ? "Repos terminé" : "Repos, encore \(Self.spoken(left))")
         .onChange(of: left) { _, now in
             if now == 10 && !model.finished {
                 AccessibilityNotification.Announcement("Plus que 10 secondes de repos.").post()
@@ -216,7 +216,7 @@ struct RestTimer: View {
                 .trim(from: 0, to: done ? 1 : fraction)
                 .stroke(done ? Theme.success : Theme.profile1, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            if done { AppIcon.check.image.font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.success) }
+            if done { AppIcon.check.image.font(Theme.icon(13, weight: .bold)).foregroundStyle(Theme.success) }
         }
         .frame(width: 34, height: 34)
     }
@@ -226,6 +226,9 @@ struct RestTimer: View {
     static func format(_ s: Int) -> String { "\(s / 60):" + String(format: "%02d", s % 60) }
 
     static func spoken(_ s: Int) -> String {
-        s >= 60 ? "\(s / 60) minute\(s / 60 > 1 ? "s" : "") \(s % 60) secondes" : "\(s) secondes"
+        let seconds = "\(s % 60) seconde\(s % 60 > 1 ? "s" : "")"
+        guard s >= 60 else { return seconds }
+        let minutes = "\(s / 60) minute\(s / 60 > 1 ? "s" : "")"
+        return s % 60 == 0 ? minutes : "\(minutes) \(seconds)"
     }
 }

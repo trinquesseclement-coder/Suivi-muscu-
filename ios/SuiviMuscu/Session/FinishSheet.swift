@@ -10,6 +10,9 @@ struct FinishSheet: View {
     @State private var duration: Double
     @State private var rpe: Int?
     @State private var notes: String
+    /// Hauteur de la feuille : ajustée au contenu, plein écran quand on écrit une note.
+    @State private var detent: PresentationDetent = .fraction(0.74)
+    @FocusState private var writing: Bool
 
     init(session: Session, onSave: @escaping (_ durationMin: Int, _ rpe: Int?, _ notes: String?) -> Void) {
         self.session = session
@@ -29,7 +32,7 @@ struct FinishSheet: View {
                 Spacer()
                 Button { dismiss() } label: {
                     AppIcon.close.image
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(Theme.icon(17, weight: .semibold))
                         .frame(width: Theme.minTouch, height: Theme.minTouch)
                         .contentShape(Rectangle())
                 }
@@ -39,13 +42,13 @@ struct FinishSheet: View {
             .padding(.top, 8)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 8) {
                         label("Durée")
                         Stepper(label: "Durée", unit: "min", step: 5, value: $duration, range: 5...240)
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        label("Ressenti global (1 = facile, 10 = à fond), facultatif")
+                        label("Ressenti, de 1 (facile) à 10 (à fond) · facultatif")
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5),
                                   spacing: 8) {
                             ForEach(1...10, id: \.self) { n in rpeButton(n) }
@@ -53,13 +56,14 @@ struct FinishSheet: View {
                         .sensoryFeedback(.selection, trigger: rpe)
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        label("Notes (douleurs, machine prise, réglages du siège…)")
-                        TextField("", text: $notes, axis: .vertical)
-                            .lineLimit(3...6)
+                        label("Notes · facultatif")
+                        TextField("Douleurs, machine prise, réglages du siège…", text: $notes, axis: .vertical)
+                            .lineLimit(2...6)
                             .font(Theme.font(.body))
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.white.opacity(0.75)))
+                            .focused($writing)
                             .accessibilityLabel("Notes")
                     }
                 }
@@ -74,7 +78,7 @@ struct FinishSheet: View {
                 Text(session.endedAt == nil ? "Terminer" : "Enregistrer")
                     .font(Theme.font(.headline, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .frame(maxWidth: .infinity, minHeight: 52)
                     .background(Capsule().fill(Theme.ink))
             }
             .buttonStyle(PressableStyle())
@@ -82,7 +86,8 @@ struct FinishSheet: View {
         }
         .padding(.horizontal, 16)
         .foregroundStyle(Theme.ink)
-        .presentationDetents([.large])
+        .onChange(of: writing) { _, on in if on { detent = .large } }
+        .presentationDetents([.fraction(0.74), .large], selection: $detent)
         .presentationDragIndicator(.visible)
         .presentationBackground(Color(hex: 0xE9EEEC))
         .presentationCornerRadius(Theme.cardRadius)

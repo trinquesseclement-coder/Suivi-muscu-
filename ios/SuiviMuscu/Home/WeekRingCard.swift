@@ -10,6 +10,8 @@ struct WeekRingCard: View {
     let appearDelay: Int
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// L'anneau grossit avec la taille de texte du téléphone, pour que le chiffre y tienne toujours.
+    @ScaledMetric(relativeTo: .largeTitle) private var ringSize: CGFloat = 104
     /// Valeurs affichées, animées depuis 0 à chaque apparition.
     @State private var shownSessions = 0
     @State private var shownMinutes = 0
@@ -24,12 +26,15 @@ struct WeekRingCard: View {
     private var ringColor: Color { reached ? Theme.success : Theme.color(for: profile) }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Circle().fill(Theme.color(for: profile)).frame(width: 9, height: 9)
                 Text(profile.name)
                     .font(Theme.font(.subheadline, weight: .semibold))
                     .lineLimit(1)
+                if isMe {
+                    Text("toi").font(Theme.font(.subheadline)).foregroundStyle(Theme.ink2)
+                }
                 Spacer(minLength: 0)
             }
 
@@ -39,18 +44,21 @@ struct WeekRingCard: View {
                 } animation: { _ in .spring(duration: 0.15, bounce: 0.3) }
 
             HStack(spacing: 5) {
+                // Horloge neutre : l'orange est réservé à Jules et aux actions.
                 AppIcon.time.image
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.orange)
+                    .font(Theme.icon(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink2)
                 Text(Stats.formatHours(shownMinutes))
-                    .font(Theme.font(.title2, weight: .bold))
+                    .font(Theme.font(.title3, weight: .bold))
                     .contentTransition(.numericText(value: Double(shownMinutes)))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
         .glassCard()
         .opacity(visible ? 1 : 0)
@@ -65,10 +73,10 @@ struct WeekRingCard: View {
 
     private var ring: some View {
         ZStack {
-            Circle().stroke(Theme.ink.opacity(0.1), lineWidth: 11)
+            Circle().stroke(Theme.ink.opacity(0.1), lineWidth: 10)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(ringColor, style: StrokeStyle(lineWidth: 11, lineCap: .round))
+                .stroke(ringColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
                 Text("\(shownSessions)")
@@ -80,8 +88,7 @@ struct WeekRingCard: View {
                     .foregroundStyle(Theme.ink2)
             }
         }
-        .frame(width: 96, height: 96)
-        .padding(.vertical, 2)
+        .frame(width: ringSize, height: ringSize)
     }
 
     private var accessibilityText: String {
