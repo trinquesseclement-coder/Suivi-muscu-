@@ -359,20 +359,20 @@ struct SessionView: View {
         dismiss()
     }
 
-    /// Comme `copyToMe` du web : une séance prévue pour moi aujourd'hui, mêmes exercices,
-    /// séries remises à « pas faites » en gardant charges et répétitions.
+    /// Comme `copyToMe` du web : une séance prévue pour moi aujourd'hui avec les mêmes exercices,
+    /// chacun préparé depuis **mon** historique et mon schéma par défaut (`Rules.newItem`),
+    /// jamais avec les charges de l'autre.
     private func copyToMe(_ s: Session) {
         let now = Date()
         let me = store.meId
+        let byId = store.exerciseById
+        let history = store.sessions
+        let scheme = Rules.defaultScheme(for: store.me)
         let copy = Session(
             id: UUID().uuidString.lowercased(), ownerId: me, createdBy: me, date: Dates.isoDate(now),
             title: s.title, status: .planned,
-            items: s.items.map { it in
-                var x = it
-                x.id = UUID().uuidString.lowercased()
-                x.sets = it.sets.map { SetEntry(kg: $0.kg, reps: $0.reps, done: false) }
-                x.cardio?.done = false
-                return x
+            items: s.items.compactMap { it in
+                byId[it.exerciseId].map { Rules.newItem($0, ownerId: me, sessions: history, scheme: scheme) }
             },
             updatedAt: AppStore.timestamp(now))
         store.saveSession(copy)

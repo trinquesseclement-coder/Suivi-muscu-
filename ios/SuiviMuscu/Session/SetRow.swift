@@ -19,11 +19,13 @@ struct SetRow: View {
     private var number: Int { index + 1 }
 
     var body: some View {
-        HStack(spacing: 6) {
+        // Largeur à 375 pt : 375 − 2×12 (page) − 2×8 (ligne) = 335 ; − 14 (n°) − 56 (coche) − 3×4 = 253,
+        // soit 126,5 pt par stepper : 2 boutons de 48 pt et 30,5 pt pour le chiffre.
+        HStack(spacing: 4) {
             Text("\(number)")
                 .font(Theme.font(.headline, weight: .semibold))
                 .foregroundStyle(Theme.ink2)
-                .frame(width: 18)
+                .frame(width: 14)
                 .accessibilityHidden(true)
             if editable {
                 Stepper(label: "Série \(number) charge", unit: "kg", step: step,
@@ -35,7 +37,7 @@ struct SetRow: View {
                 readOnly
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(entry.done ? Theme.success.opacity(0.16) : Color.clear)
         .motion(Motion.spring, value: entry.done)

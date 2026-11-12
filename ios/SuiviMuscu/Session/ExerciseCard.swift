@@ -243,7 +243,7 @@ struct SchemeToggle: View {
             .padding(.horizontal, 14)
             .frame(minHeight: 36)
             .background(Capsule().fill(active ? Theme.ink : Color.clear))
-            .frame(minHeight: 44)
+            .frame(minHeight: Theme.minTouch)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

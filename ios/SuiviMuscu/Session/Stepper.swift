@@ -22,7 +22,7 @@ struct Stepper: View {
                     .monospacedDigit()
                     .contentTransition(.numericText(value: value))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .minimumScaleFactor(0.5)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(Theme.font(.caption2))
@@ -55,8 +55,9 @@ struct Stepper: View {
         Button { change(by: delta) } label: {
             icon.image
                 .font(.system(size: 17, weight: .bold))
-                .frame(maxWidth: 48, maxHeight: .infinity)
-                .frame(minWidth: 38)
+                // Zone tactile fixe de 48 pt : c'est le chiffre au milieu qui rétrécit si la place manque.
+                .frame(width: Theme.minTouch)
+                .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(StepperButtonStyle())
