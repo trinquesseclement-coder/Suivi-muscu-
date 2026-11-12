@@ -15,6 +15,18 @@ struct PlanRoute: Hashable {
     var date: String?
 }
 
+/// Les Réglages, poussés sur la pile comme les autres écrans (un lien poussé depuis une destination
+/// `isPresented` ne s'ouvrait pas : tout passe par `path`).
+struct SettingsRoute: Hashable {
+    /// Carte amenée en haut à l'ouverture (`nil` : le haut des Réglages).
+    var focus: SettingsFocus?
+}
+
+/// L'éditeur d'une séance type du cycle (`templateId == nil` : une nouvelle).
+struct CycleRoute: Hashable {
+    var templateId: String?
+}
+
 extension View {
     /// Marque la vue comme point de départ du zoom vers une séance.
     @ViewBuilder func zoomSource(_ id: String, in namespace: Namespace.ID?) -> some View {

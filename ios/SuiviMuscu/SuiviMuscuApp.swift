@@ -18,8 +18,11 @@ struct SuiviMuscuApp: App {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         // `-demo` n'existe qu'en DEBUG et n'écrit que dans `suivi-demo.json` : jamais dans les vraies données.
-        let store = args.contains("-demo")
-            ? AppStore.demo(fileURL: AppStore.demoFileURL(besides: url), today: Dates.isoDate(Date()), now: Date())
+        // `-demo-keep` rouvre ce fichier tel quel (vérifier qu'un changement survit à une relance).
+        let demoURL = AppStore.demoFileURL(besides: url)
+        let store = args.contains("-demo-keep") ? AppStore(fileURL: demoURL)
+            : args.contains("-demo")
+            ? AppStore.demo(fileURL: demoURL, today: Dates.isoDate(Date()), now: Date())
             : AppStore(fileURL: url)
         // Mise au point : voir l'appli comme Jules sans passer par les Réglages.
         if args.contains("-as-jules") { store.switchProfile(to: AppStore.julesId) }

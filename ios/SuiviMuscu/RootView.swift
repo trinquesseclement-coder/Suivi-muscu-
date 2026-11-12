@@ -33,8 +33,6 @@ struct RootView: View {
     @State private var planningWeek = Dates.isoDate(Date())
     @Namespace private var zoom
 
-    @State private var showSettings = false
-
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -43,7 +41,7 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $showSettings) { SettingsView() }
+            .navigationDestination(for: SettingsRoute.self) { SettingsView(focus: $0.focus) }
             .navigationDestination(for: SessionRoute.self) { route in
                 SessionView(sessionId: route.id, fresh: route.fresh,
                             onReplace: { id in path = NavigationPath([SessionRoute(id: id, source: route.source)]) },
@@ -51,6 +49,7 @@ struct RootView: View {
                 .navigationTransition(.zoom(sourceID: route.source, in: zoom))
             }
             .navigationDestination(for: PlanRoute.self, destination: planDestination)
+            .navigationDestination(for: CycleRoute.self) { CycleTemplateEditor(templateId: $0.templateId) }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -78,9 +77,8 @@ struct RootView: View {
         switch tab {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
-                     onAvatar: { showSettings = true },
-                     // Les Réglages, en attendant leur section « Mon cycle » (tâche 3).
-                     onEditCycle: { showSettings = true })
+                     onAvatar: { openSettings() },
+                     onEditCycle: { openSettings(focus: .cycle) })
         case .planning:
             PlanningView(week: $planningWeek, zoom: zoom,
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
@@ -106,6 +104,10 @@ struct RootView: View {
         }
     }
 
+    private func openSettings(focus: SettingsFocus? = nil) {
+        path.append(SettingsRoute(focus: focus))
+    }
+
     private func open(_ route: SessionRoute) {
         path.append(route)
     }
@@ -123,7 +125,9 @@ struct RootView: View {
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
     /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
-    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier,
+    /// `-open-cycle` les Réglages sur la carte « Mon cycle », `-open-cycle-template <id>` (ou `new`)
+    /// l'éditeur d'une séance type par-dessus, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -137,7 +141,13 @@ struct RootView: View {
             planningWeek = args[i + 1]
         }
         prepareDemoForCycle(args)
-        if args.contains("-open-settings") || args.contains("-import-file") { showSettings = true; return }
+        if args.contains("-open-settings") || args.contains("-import-file") { openSettings(); return }
+        if args.contains("-open-cycle") { openSettings(focus: .cycle); return }
+        if let i = args.firstIndex(of: "-open-cycle-template"), i + 1 < args.count {
+            path = NavigationPath([SettingsRoute(focus: .cycle)])
+            path.append(CycleRoute(templateId: args[i + 1] == "new" ? nil : args[i + 1]))
+            return
+        }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
         } else if args.contains("-open-next"),

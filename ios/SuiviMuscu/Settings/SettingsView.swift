@@ -1,8 +1,17 @@
 import SwiftUI
 import SuiviCore
 
-/// Réglages essentiels : profils, séance, salle (copie de `appli/src/pages/Settings.tsx`).
+/// Une carte des Réglages à montrer dès l'ouverture.
+enum SettingsFocus: Hashable {
+    /// « Modifier le cycle », depuis l'accueil.
+    case cycle
+}
+
+/// Réglages essentiels : profils, séance, cycle, salle (copie de `appli/src/pages/Settings.tsx`).
 struct SettingsView: View {
+    /// Carte amenée en haut à l'ouverture (`nil` : le haut des Réglages).
+    var focus: SettingsFocus? = nil
+
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @AppStorage("rest.seconds") private var restSeconds = 90
@@ -11,29 +20,41 @@ struct SettingsView: View {
 
     /// L'autre profil est replié par défaut : on règle surtout le sien.
     @State private var showPartner = false
+    /// La carte demandée n'est amenée qu'une fois (pas au retour de l'éditeur du cycle).
+    @State private var focused = false
 
     var body: some View {
         let me = store.me
         let partner = store.partner
         return ZStack {
             Theme.background.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    header
-                    whoCard
-                    card("Mon profil") { ProfileEditor(profile: me).id(me.id) }
-                    partnerCard(partner)
-                    card("Séance") {
-                        SettingsStepper(title: "Temps de repos", valueText: Self.restText(restSeconds),
-                                        value: $restSeconds, range: 30...180, step: 15)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        header
+                        whoCard
+                        card("Mon profil") { ProfileEditor(profile: me).id(me.id) }
+                        partnerCard(partner)
+                        card("Séance") {
+                            SettingsStepper(title: "Temps de repos", valueText: Self.restText(restSeconds),
+                                            value: $restSeconds, range: 30...180, step: 15)
+                        }
+                        // Repère 12 pt au-dessus de la carte : amenée en haut, elle ne colle pas au bord.
+                        Color.clear.frame(height: 0).padding(.bottom, -12).id(SettingsFocus.cycle)
+                        CycleSection()
+                        BackupSection()
+                        gymCard
                     }
-                    BackupSection()
-                    gymCard
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .scrollDismissesKeyboard(.interactively)
+                .onAppear {
+                    guard let focus, !focused else { return }
+                    focused = true
+                    proxy.scrollTo(focus, anchor: .top)
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
         }
         .toolbar(.hidden, for: .navigationBar)
         // Une ancienne valeur hors bornes (30 à 180 s) est ramenée dans la plage.
