@@ -1,0 +1,31 @@
+name: SuiviMuscu
+options:
+  bundleIdPrefix: fr.suivimuscu
+  deploymentTarget:
+    iOS: "18.0"
+packages:
+  SuiviCore:
+    path: SuiviCore
+targets:
+  SuiviMuscu:
+    type: application
+    platform: iOS
+    sources:
+      - SuiviMuscu
+    dependencies:
+      - package: SuiviCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.suivimuscu.app
+        PRODUCT_NAME: SuiviMuscu
+        DEVELOPMENT_TEAM: ""
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Suivi Muscu"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
