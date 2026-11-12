@@ -78,7 +78,9 @@ struct RootView: View {
         switch tab {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
-                     onAvatar: { showSettings = true })
+                     onAvatar: { showSettings = true },
+                     // Les Réglages, en attendant leur section « Mon cycle » (tâche 3).
+                     onEditCycle: { showSettings = true })
         case .planning:
             PlanningView(week: $planningWeek, zoom: zoom,
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
@@ -134,6 +136,7 @@ struct RootView: View {
         if let i = args.firstIndex(of: "-planning-week"), i + 1 < args.count {
             planningWeek = args[i + 1]
         }
+        prepareDemoForCycle(args)
         if args.contains("-open-settings") || args.contains("-import-file") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
@@ -147,6 +150,27 @@ struct RootView: View {
         }
         #endif
     }
+
+    #if DEBUG
+    /// Mise au point de la carte du cycle, sur les données de démo seulement : `-demo-nobody-live`
+    /// supprime les séances en cours (les deux sont libres), `-demo-hide-cycle <id>` masque les
+    /// machines d'une séance type (message « plus d'exercice »).
+    private func prepareDemoForCycle(_ args: [String]) {
+        guard args.contains("-demo") else { return }
+        let now = Date()
+        if args.contains("-demo-nobody-live") {
+            for s in store.sessions where Rules.isLive(s, now: now) { store.deleteSession(id: s.id) }
+        }
+        if let i = args.firstIndex(of: "-demo-hide-cycle"), i + 1 < args.count,
+           let template = store.cycle.templates.first(where: { $0.id == args[i + 1] }) {
+            for item in template.items {
+                guard var ex = store.exerciseById[item.exerciseId] else { continue }
+                ex.deleted = true
+                store.saveExercise(ex)
+            }
+        }
+    }
+    #endif
 
     /// Barre d'onglets flottante : cinq cases de même largeur, alignées sur les cartes (16 pt de marge),
     /// chaque onglet avec son nom, et le « + » orange au centre.

@@ -11,6 +11,8 @@ struct HomeView: View {
     var onFreeSession: () -> Void = {}
     /// Ouvre les Réglages (tâche 10).
     var onAvatar: () -> Void = {}
+    /// « Modifier le cycle », depuis la carte du cycle.
+    var onEditCycle: () -> Void = {}
 
     @Environment(AppStore.self) private var store
 
@@ -23,6 +25,9 @@ struct HomeView: View {
 
         // Aucune séance du tout (première ouverture) : une carte d'accueil remplace le fil vide.
         let firstRun = sessions.isEmpty
+        // Ni séance en cours ni séance prévue aujourd'hui : la carte du cycle propose la suivante.
+        let offersCycle = !store.cycle.templates.isEmpty
+            && CyclePlanner.offersCycle(sessions: sessions, ownerId: me.id, today: today, now: now)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -41,7 +46,8 @@ struct HomeView: View {
                 TogetherCard(days: together.days, minutes: together.minutes)
 
                 if firstRun {
-                    WelcomeCard(zoom: zoom, onStart: onFreeSession)
+                    if offersCycle { cycleCard }
+                    WelcomeCard(zoom: zoom, withCycle: offersCycle, onStart: onFreeSession)
                 } else {
                     // Comme le web : la séance en cours de l'autre (sa séance prévue de demain passe avant
                     // dans le tri par date, d'où la recherche directe).
@@ -53,12 +59,17 @@ struct HomeView: View {
                     }
 
                     // Ma séance en cours d'abord (pour y revenir après avoir quitté l'appli), sinon la prochaine prévue.
+                    // Avec la carte du cycle, `next` ne peut être qu'une séance prévue plus tard : son
+                    // bandeau reste dessous ; sans séance prévue, la carte remplace « Aucune séance prévue ».
                     let next = Self.nextSession(sessions, meId: me.id, now: now)
-                    NextSessionCard(session: next,
-                                    live: next.map { Rules.isLive($0, now: now) } ?? false,
-                                    zoom: zoom,
-                                    onOpen: { if let next { onOpenSession(SessionRoute(id: next.id, source: "next")) } },
-                                    onFree: onFreeSession)
+                    if offersCycle { cycleCard }
+                    if !offersCycle || next != nil {
+                        NextSessionCard(session: next,
+                                        live: next.map { Rules.isLive($0, now: now) } ?? false,
+                                        zoom: zoom,
+                                        onOpen: { if let next { onOpenSession(SessionRoute(id: next.id, source: "next")) } },
+                                        onFree: onFreeSession)
+                    }
 
                     SessionFeed(sessions: feed(sessions, today: today), zoom: zoom) { s in
                         onOpenSession(SessionRoute(id: s.id, source: "feed-\(s.id)"))
@@ -71,6 +82,10 @@ struct HomeView: View {
             .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var cycleCard: some View {
+        CycleCard(zoom: zoom, onOpenSession: onOpenSession, onEditCycle: onEditCycle)
     }
 
     /// En-tête : le logo de la salle en surtitre, « Cette semaine » en grand, la photo à droite.
