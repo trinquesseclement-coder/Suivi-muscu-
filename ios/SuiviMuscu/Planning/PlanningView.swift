@@ -75,9 +75,9 @@ struct PlanningView: View {
         withAnimation(reduceMotion ? Motion.reduced : Motion.spring) { week = today }
     }
 
-    /// Séance prévue que j'ai créée : l'éditeur ; tout le reste s'ouvre normalement.
+    /// Séance prévue que j'ai créée et pas encore commencée : l'éditeur ; le reste s'ouvre normalement.
     private func tap(_ s: Session) {
-        if s.status == .planned && s.createdBy == store.meId {
+        if Rules.isEditablePlan(s, meId: store.meId) {
             onEditPlan(s.id)
         } else {
             onOpenSession(s.id)
@@ -164,7 +164,7 @@ private struct DayRows: View {
     let onPlan: (String) -> Void
 
     @Environment(AppStore.self) private var store
-    @ScaledMetric(relativeTo: .title3) private var labelWidth: CGFloat = 44
+    @ScaledMetric(relativeTo: .title3) private var labelWidth: CGFloat = 48
     @ScaledMetric(relativeTo: .title3) private var todaySize: CGFloat = 36
 
     var body: some View {
@@ -175,31 +175,37 @@ private struct DayRows: View {
             ForEach(Array(days.enumerated()), id: \.element) { i, d in
                 if i > 0 { Rectangle().fill(Theme.ink.opacity(0.1)).frame(height: 1) }
                 let list = PlanningWeek.sessions(on: d, in: all, profiles: profiles)
-                HStack(alignment: .top, spacing: 12) {
-                    dayLabel(d)
-                    VStack(spacing: 8) {
-                        ForEach(list) { s in
-                            let owner = profiles.first { $0.id == s.ownerId }
-                            SessionChip(session: s, owner: owner, live: Rules.isLive(s, now: now),
-                                        help: PlanningWeek.helpCount(s, profiles: profiles, byId: byId),
-                                        editable: s.status == .planned && s.createdBy == store.meId) {
-                                onSession(s)
-                            }
-                            .zoomSource("planning-\(s.id)", in: zoom)
-                        }
-                        if d >= today {
-                            planButton(d)
-                        } else if list.isEmpty {
-                            Text("—")
-                                .font(Theme.font(.body))
-                                .foregroundStyle(Theme.ink2)
-                                .frame(maxWidth: .infinity, minHeight: Theme.minTouch, alignment: .leading)
-                                .accessibilityLabel("Aucune séance")
-                        }
+                if list.isEmpty && d < today {
+                    // Jour passé sans séance : une seule ligne discrète, pas de grand vide.
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        compactLabel(d)
+                        Text("—")
+                            .font(Theme.font(.subheadline))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.vertical, 12)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(Format.day(d, today: today)), aucune séance")
+                } else {
+                    HStack(alignment: .top, spacing: 12) {
+                        dayLabel(d)
+                        VStack(spacing: 8) {
+                            ForEach(list) { s in
+                                let owner = profiles.first { $0.id == s.ownerId }
+                                SessionChip(session: s, owner: owner, live: Rules.isLive(s, now: now),
+                                            help: PlanningWeek.helpCount(s, profiles: profiles, byId: byId),
+                                            editable: Rules.isEditablePlan(s, meId: store.meId)) {
+                                    onSession(s)
+                                }
+                                .zoomSource("planning-\(s.id)", in: zoom)
+                            }
+                            if d >= today { planButton(d) }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .padding(.vertical, 12)
                 }
-                .padding(.vertical, 12)
             }
         }
     }
@@ -223,6 +229,20 @@ private struct DayRows: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Format.day(d, today: today))
         .accessibilityAddTraits(.isHeader)
+    }
+
+    /// « LUN 9 » sur une ligne, centré dans la même colonne que les jours pleins.
+    private func compactLabel(_ d: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(Format.weekdayShort(d).uppercased())
+                .font(Theme.font(.caption2, weight: .semibold))
+            Text(Format.dayOfMonth(d))
+                .font(Theme.font(.subheadline, weight: .semibold))
+                .monospacedDigit()
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .frame(width: labelWidth)
     }
 
     private func planButton(_ d: String) -> some View {

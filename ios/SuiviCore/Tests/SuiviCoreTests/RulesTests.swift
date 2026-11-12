@@ -253,4 +253,18 @@ import Testing
         let undone = doneSession("u", items: [item([set(10, 10)])])
         #expect(Stats.lastPerformance([undone], ownerId: "p1", exerciseId: Self.exo.id) == nil)
     }
+
+    /// Éditeur de plan : seulement une séance prévue que j'ai créée et pas encore commencée.
+    @Test func isEditablePlan() {
+        func planned(createdBy: String = "p1", startedAt: String? = nil, done: Bool = false) -> Session {
+            Session(id: "s", ownerId: "p2", createdBy: createdBy, date: "2026-11-13", title: "Séance",
+                    status: .planned, items: [item([set(40, 10, done)])], startedAt: startedAt,
+                    updatedAt: "2026-11-10T10:00:00.000Z")
+        }
+        #expect(Rules.isEditablePlan(planned(), meId: "p1"))
+        #expect(!Rules.isEditablePlan(planned(startedAt: "2026-11-13T17:00:00.000Z"), meId: "p1"))
+        #expect(!Rules.isEditablePlan(planned(done: true), meId: "p1"))
+        #expect(!Rules.isEditablePlan(planned(createdBy: "p2"), meId: "p1"))
+        #expect(!Rules.isEditablePlan(doneSession("d", owner: "p1", items: [item([set(40, 10)])]), meId: "p1"))
+    }
 }

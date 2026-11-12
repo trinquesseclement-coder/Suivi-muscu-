@@ -126,6 +126,12 @@ public enum Rules {
         s.items.contains { $0.sets.contains(where: \.done) || $0.cardio?.done == true }
     }
 
+    /// Séance qui s'ouvre dans l'éditeur de plan : prévue, créée par moi, pas encore commencée
+    /// (ni démarrée, ni aucune série validée). Toutes les autres s'ouvrent normalement.
+    public static func isEditablePlan(_ s: Session, meId: String) -> Bool {
+        s.status == .planned && s.createdBy == meId && s.startedAt == nil && !hasProgress(s)
+    }
+
     static func parseTimestamp(_ string: String) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
