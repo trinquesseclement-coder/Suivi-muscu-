@@ -33,8 +33,6 @@ struct RootView: View {
     @State private var planningWeek = Dates.isoDate(Date())
     @Namespace private var zoom
 
-    @State private var showSettings = false
-
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -43,7 +41,14 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { tabBar }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $showSettings) { SettingsView() }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                SettingsView(focus: route.focus)
+                    .environment(\.openCycleTemplate, OpenCycleTemplateAction { id in
+                        // Depuis les Réglages seulement (une seule fois, même sur un double appui).
+                        guard path.count == 1 else { return }
+                        path.append(CycleRoute(templateId: id))
+                    })
+            }
             .navigationDestination(for: SessionRoute.self) { route in
                 SessionView(sessionId: route.id, fresh: route.fresh,
                             onReplace: { id in path = NavigationPath([SessionRoute(id: id, source: route.source)]) },
@@ -51,6 +56,7 @@ struct RootView: View {
                 .navigationTransition(.zoom(sourceID: route.source, in: zoom))
             }
             .navigationDestination(for: PlanRoute.self, destination: planDestination)
+            .navigationDestination(for: CycleRoute.self) { CycleTemplateEditor(templateId: $0.templateId) }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -78,7 +84,8 @@ struct RootView: View {
         switch tab {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
-                     onAvatar: { showSettings = true })
+                     onAvatar: { openSettings() },
+                     onEditCycle: { openSettings(focus: .cycle) })
         case .planning:
             PlanningView(week: $planningWeek, zoom: zoom,
                          onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
@@ -104,6 +111,13 @@ struct RootView: View {
         }
     }
 
+    /// Les Réglages s'ouvrent depuis l'accueil seulement : un double appui sur la photo (ou un appui
+    /// pendant l'animation) n'empile pas un second écran.
+    private func openSettings(focus: SettingsFocus? = nil) {
+        guard path.isEmpty else { return }
+        path.append(SettingsRoute(focus: focus))
+    }
+
     private func open(_ route: SessionRoute) {
         path.append(route)
     }
@@ -121,7 +135,9 @@ struct RootView: View {
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
     /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
-    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier,
+    /// `-open-cycle` les Réglages sur la carte « Mon cycle », `-open-cycle-template <id>` (ou `new`)
+    /// l'éditeur d'une séance type par-dessus, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
     /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
@@ -134,7 +150,14 @@ struct RootView: View {
         if let i = args.firstIndex(of: "-planning-week"), i + 1 < args.count {
             planningWeek = args[i + 1]
         }
-        if args.contains("-open-settings") || args.contains("-import-file") { showSettings = true; return }
+        prepareDemoForCycle(args)
+        if args.contains("-open-settings") || args.contains("-import-file") { openSettings(); return }
+        if args.contains("-open-cycle") { openSettings(focus: .cycle); return }
+        if let i = args.firstIndex(of: "-open-cycle-template"), i + 1 < args.count {
+            path = NavigationPath([SettingsRoute(focus: .cycle)])
+            path.append(CycleRoute(templateId: args[i + 1] == "new" ? nil : args[i + 1]))
+            return
+        }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
             path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
         } else if args.contains("-open-next"),
@@ -147,6 +170,27 @@ struct RootView: View {
         }
         #endif
     }
+
+    #if DEBUG
+    /// Mise au point de la carte du cycle, sur les données de démo seulement : `-demo-nobody-live`
+    /// supprime les séances en cours (les deux sont libres), `-demo-hide-cycle <id>` masque les
+    /// machines d'une séance type (message « plus d'exercice »).
+    private func prepareDemoForCycle(_ args: [String]) {
+        guard args.contains("-demo") else { return }
+        let now = Date()
+        if args.contains("-demo-nobody-live") {
+            for s in store.sessions where Rules.isLive(s, now: now) { store.deleteSession(id: s.id) }
+        }
+        if let i = args.firstIndex(of: "-demo-hide-cycle"), i + 1 < args.count,
+           let template = store.cycle.templates.first(where: { $0.id == args[i + 1] }) {
+            for item in template.items {
+                guard var ex = store.exerciseById[item.exerciseId] else { continue }
+                ex.deleted = true
+                store.saveExercise(ex)
+            }
+        }
+    }
+    #endif
 
     /// Barre d'onglets flottante : cinq cases de même largeur, alignées sur les cartes (16 pt de marge),
     /// chaque onglet avec son nom, et le « + » orange au centre.

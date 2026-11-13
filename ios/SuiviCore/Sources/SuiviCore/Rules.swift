@@ -31,9 +31,13 @@ public enum Rules {
         case .pyramid:
             let reps = RepScheme.pyramid.reps
             var kgs = [Double](repeating: 0, count: reps.count)
-            if let l = last?.item, l.scheme == .pyramid {
-                let done = Stats.doneSets(l)
-                if done.count == reps.count { kgs = done.map(\.kg) }
+            // Pyramide la dernière fois : les charges position par position, validées ou non.
+            // Il en manque : la série 4 reprend la série 1, une autre la série d'avant.
+            if let l = last?.item, l.scheme == .pyramid, let first = l.sets.first {
+                for i in kgs.indices {
+                    if l.sets.indices.contains(i) { kgs[i] = l.sets[i].kg }
+                    else { kgs[i] = i == reps.count - 1 ? first.kg : kgs[i - 1] }
+                }
             }
             let sets = zip(kgs, reps).map { SetEntry(kg: $0, reps: $1, done: false) }
             return SessionItem(id: id, exerciseId: ex.id, sets: sets, scheme: .pyramid)
@@ -111,6 +115,13 @@ public enum Rules {
     /// Schéma par défaut d'un profil : réglage, sinon pyramide pour le profil 1 et classique pour le 2.
     public static func defaultScheme(for p: Profile) -> RepScheme {
         p.settings?.defaultScheme ?? (p.slot == 1 ? .pyramid : .classic)
+    }
+
+    /// Façon de faire un exercice pour `owner` : celle de sa dernière fois quand l'appli l'a notée
+    /// (schéma présent), sinon le réglage du profil (dernière fois de l'ère web, ou jamais fait).
+    public static func scheme(for ex: Exercise, owner: Profile, sessions: [Session]) -> RepScheme {
+        Stats.lastPerformance(sessions, ownerId: owner.id, exerciseId: ex.id)?.item.scheme
+            ?? defaultScheme(for: owner)
     }
 
     // MARK: Séance

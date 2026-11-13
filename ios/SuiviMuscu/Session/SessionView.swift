@@ -363,14 +363,17 @@ struct SessionView: View {
 
     private func addExercise() { picking = true }
 
-    /// Chaque exercice choisi est préparé depuis l'historique du propriétaire et son schéma par défaut
-    /// (`Rules.newItem`), dans l'ordre de sélection, puis la séance est enregistrée une seule fois.
+    /// Chaque exercice choisi est préparé depuis l'historique du propriétaire, avec sa façon de faire
+    /// de la dernière fois (`Rules.scheme`, `Rules.newItem`), dans l'ordre de sélection, puis la
+    /// séance est enregistrée une seule fois.
     private func addExercises(_ exercises: [Exercise]) {
         guard let s = store.session(sessionId), !exercises.isEmpty else { return }
         let owner = store.profiles.first { $0.id == s.ownerId } ?? store.me
-        let scheme = Rules.defaultScheme(for: owner)
         let history = store.sessions
-        let items = exercises.map { Rules.newItem($0, ownerId: s.ownerId, sessions: history, scheme: scheme) }
+        let items = exercises.map {
+            Rules.newItem($0, ownerId: s.ownerId, sessions: history,
+                          scheme: Rules.scheme(for: $0, owner: owner, sessions: history))
+        }
         update { $0.items.append(contentsOf: items) }
     }
 
@@ -426,20 +429,24 @@ struct SessionView: View {
     }
 
     /// Comme `copyToMe` du web : une séance prévue pour moi aujourd'hui avec les mêmes exercices,
-    /// chacun préparé depuis **mon** historique et mon schéma par défaut (`Rules.newItem`),
-    /// jamais avec les charges de l'autre.
+    /// chacun préparé depuis **mon** historique et ma façon de faire de la dernière fois
+    /// (`Rules.scheme`, `Rules.newItem`), jamais avec les charges de l'autre. Elle garde la séance
+    /// type du cycle : la faire fait avancer mon cycle.
     private func copyToMe(_ s: Session) {
         let now = Date()
-        let me = store.meId
+        let me = store.me
         let byId = store.exerciseById
         let history = store.sessions
-        let scheme = Rules.defaultScheme(for: store.me)
         let copy = Session(
-            id: UUID().uuidString.lowercased(), ownerId: me, createdBy: me, date: Dates.isoDate(now),
+            id: UUID().uuidString.lowercased(), ownerId: me.id, createdBy: me.id, date: Dates.isoDate(now),
             title: s.title, status: .planned,
             items: s.items.compactMap { it in
-                byId[it.exerciseId].map { Rules.newItem($0, ownerId: me, sessions: history, scheme: scheme) }
+                byId[it.exerciseId].map {
+                    Rules.newItem($0, ownerId: me.id, sessions: history,
+                                  scheme: Rules.scheme(for: $0, owner: me, sessions: history))
+                }
             },
+            cycleId: s.cycleId,
             updatedAt: AppStore.timestamp(now))
         store.saveSession(copy)
         onReplace(copy.id)

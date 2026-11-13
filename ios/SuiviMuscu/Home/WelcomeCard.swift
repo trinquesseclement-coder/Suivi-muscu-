@@ -1,8 +1,10 @@
 import SwiftUI
 
 /// Première ouverture, aucune séance : dit quoi faire et pourquoi, avec le bouton pour commencer.
+/// Sous la carte du cycle (`withCycle`), le bouton devient un lien discret vers une séance libre.
 struct WelcomeCard: View {
     var zoom: Namespace.ID? = nil
+    var withCycle = false
     let onStart: () -> Void
 
     var body: some View {
@@ -19,23 +21,41 @@ struct WelcomeCard: View {
                     .accessibilityAddTraits(.isHeader)
             }
             VStack(alignment: .leading, spacing: 10) {
-                tip("Ajoute tes machines au fur et à mesure, avec le filtre « Depuis le fauteuil ».")
+                if withCycle {
+                    tip("Fais les séances du cycle dans l’ordre : la suivante t’attend juste au-dessus.")
+                } else {
+                    tip("Ajoute tes machines au fur et à mesure, avec le filtre « Depuis le fauteuil ».")
+                }
                 tip("Valide chaque série d’un appui : le repos démarre tout seul.")
                 tip("La prochaine fois, tes charges seront déjà remplies.")
             }
-            Button(action: onStart) {
-                HStack(spacing: 8) {
-                    AppIcon.play.image.font(Theme.icon(13, weight: .bold))
-                    Text("Commencer une séance")
+            if withCycle {
+                Button(action: onStart) {
+                    Text("Ou lancer une séance libre")
+                        .font(Theme.font(.subheadline, weight: .semibold))
+                        .underline()
+                        .foregroundStyle(Theme.ink2)
+                        .frame(maxWidth: .infinity, minHeight: Theme.minTouch)
+                        .contentShape(Rectangle())
+                        .zoomSource("free", in: zoom)
                 }
-                .font(Theme.font(.headline, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(Capsule().fill(Theme.orange))
-                .zoomSource("free", in: zoom)
+                .buttonStyle(PressableStyle())
+                .padding(.bottom, -8)
+            } else {
+                Button(action: onStart) {
+                    HStack(spacing: 8) {
+                        AppIcon.play.image.font(Theme.icon(13, weight: .bold))
+                        Text("Commencer une séance")
+                    }
+                    .font(Theme.font(.headline, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(Capsule().fill(Theme.orange))
+                    .zoomSource("free", in: zoom)
+                }
+                .buttonStyle(PressableStyle())
+                .padding(.top, 2)
             }
-            .buttonStyle(PressableStyle())
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)

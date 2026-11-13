@@ -135,18 +135,20 @@ public struct Session: Codable, Hashable, Identifiable, Sendable {
     public var endedAt: String?
     /// Même valeur pour les séances planifiées ensemble.
     public var groupId: String?
+    /// Séance type du cycle d'où vient la séance (`CycleTemplate.id`), `nil` hors cycle.
+    public var cycleId: String?
     public var deleted: Bool?
     public var updatedAt: String
 
     public init(id: String, ownerId: String, createdBy: String, date: String, title: String,
                 status: SessionStatus, items: [SessionItem] = [], notes: String? = nil,
                 rpe: Int? = nil, durationMin: Int? = nil, startedAt: String? = nil,
-                endedAt: String? = nil, groupId: String? = nil, deleted: Bool? = nil,
-                updatedAt: String) {
+                endedAt: String? = nil, groupId: String? = nil, cycleId: String? = nil,
+                deleted: Bool? = nil, updatedAt: String) {
         self.id = id; self.ownerId = ownerId; self.createdBy = createdBy; self.date = date
         self.title = title; self.status = status; self.items = items; self.notes = notes
         self.rpe = rpe; self.durationMin = durationMin; self.startedAt = startedAt
-        self.endedAt = endedAt; self.groupId = groupId; self.deleted = deleted
+        self.endedAt = endedAt; self.groupId = groupId; self.cycleId = cycleId; self.deleted = deleted
         self.updatedAt = updatedAt
     }
 }

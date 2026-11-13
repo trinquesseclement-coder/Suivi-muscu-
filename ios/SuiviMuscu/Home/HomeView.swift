@@ -11,11 +11,17 @@ struct HomeView: View {
     var onFreeSession: () -> Void = {}
     /// Ouvre les Réglages (tâche 10).
     var onAvatar: () -> Void = {}
+    /// « Modifier le cycle », depuis la carte du cycle.
+    var onEditCycle: () -> Void = {}
 
     @Environment(AppStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
+    /// L'heure de l'accueil, relue à l'apparition et à chaque retour au premier plan : rouverte le
+    /// lendemain, l'appli recalcule « aujourd'hui » (carte du cycle, séance de l'autre…).
+    @State private var now = AppClock.now()
 
     var body: some View {
-        let now = Date()
+        let now = self.now
         let today = Dates.isoDate(now)
         let me = store.me
         let partner = store.partner
@@ -23,6 +29,9 @@ struct HomeView: View {
 
         // Aucune séance du tout (première ouverture) : une carte d'accueil remplace le fil vide.
         let firstRun = sessions.isEmpty
+        // Ni séance en cours ni séance prévue aujourd'hui : la carte du cycle propose la suivante.
+        let offersCycle = !store.cycle.templates.isEmpty
+            && CyclePlanner.offersCycle(sessions: sessions, ownerId: me.id, today: today, now: now)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -41,7 +50,8 @@ struct HomeView: View {
                 TogetherCard(days: together.days, minutes: together.minutes)
 
                 if firstRun {
-                    WelcomeCard(zoom: zoom, onStart: onFreeSession)
+                    if offersCycle { cycleCard(now: now) }
+                    WelcomeCard(zoom: zoom, withCycle: offersCycle, onStart: onFreeSession)
                 } else {
                     // Comme le web : la séance en cours de l'autre (sa séance prévue de demain passe avant
                     // dans le tri par date, d'où la recherche directe).
@@ -53,12 +63,17 @@ struct HomeView: View {
                     }
 
                     // Ma séance en cours d'abord (pour y revenir après avoir quitté l'appli), sinon la prochaine prévue.
+                    // Avec la carte du cycle, `next` ne peut être qu'une séance prévue plus tard : son
+                    // bandeau reste dessous ; sans séance prévue, la carte remplace « Aucune séance prévue ».
                     let next = Self.nextSession(sessions, meId: me.id, now: now)
-                    NextSessionCard(session: next,
-                                    live: next.map { Rules.isLive($0, now: now) } ?? false,
-                                    zoom: zoom,
-                                    onOpen: { if let next { onOpenSession(SessionRoute(id: next.id, source: "next")) } },
-                                    onFree: onFreeSession)
+                    if offersCycle { cycleCard(now: now) }
+                    if !offersCycle || next != nil {
+                        NextSessionCard(session: next,
+                                        live: next.map { Rules.isLive($0, now: now) } ?? false,
+                                        zoom: zoom,
+                                        onOpen: { if let next { onOpenSession(SessionRoute(id: next.id, source: "next")) } },
+                                        onFree: onFreeSession)
+                    }
 
                     SessionFeed(sessions: feed(sessions, today: today), zoom: zoom) { s in
                         onOpenSession(SessionRoute(id: s.id, source: "feed-\(s.id)"))
@@ -71,6 +86,15 @@ struct HomeView: View {
             .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
+        .onAppear { self.now = AppClock.now() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { self.now = AppClock.now() }
+        }
+    }
+
+    private func cycleCard(now: Date) -> some View {
+        CycleCard(now: now, zoom: zoom, onOpenSession: onOpenSession, onEditCycle: onEditCycle,
+                  onOutdated: { self.now = AppClock.now() })
     }
 
     /// En-tête : le logo de la salle en surtitre, « Cette semaine » en grand, la photo à droite.
@@ -118,5 +142,19 @@ struct HomeView: View {
     private func feed(_ sessions: [Session], today: String) -> [Session] {
         let limit = Dates.addDays(today, -60)
         return Array(sessions.filter { $0.status == .done && $0.date >= limit }.prefix(8))
+    }
+}
+
+/// L'heure courante de l'appli. En DEBUG, le réglage `debugDayOffset` (jours, modifiable appli
+/// ouverte : `xcrun simctl spawn booted defaults write fr.suivimuscu.app debugDayOffset -int 1`)
+/// décale l'accueil et la carte du cycle, pour vérifier un retour « le lendemain ».
+enum AppClock {
+    static func now() -> Date {
+        #if DEBUG
+        let days = UserDefaults.standard.integer(forKey: "debugDayOffset")
+        return Date().addingTimeInterval(Double(days) * 86_400)
+        #else
+        return Date()
+        #endif
     }
 }

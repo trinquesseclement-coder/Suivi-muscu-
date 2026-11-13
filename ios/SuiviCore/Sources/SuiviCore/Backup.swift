@@ -86,6 +86,8 @@ public struct BackupContent: Sendable {
     public var profiles: [String: Profile]
     public var sessions: [String: Session]
     public var exercises: [String: ExerciseOverride]
+    /// Le cycle de la sauvegarde, `nil` s'il est absent ou illisible.
+    public var cycle: Cycle?
     /// Entrées ignorées parce qu'illisibles.
     public var skipped: Int
 }
@@ -97,7 +99,8 @@ public enum BackupError: Error, Sendable {
     case storeLocked
 }
 
-/// Sauvegarde au format du web : `{ version: 1, exportedAt, profiles, sessions, exercises }`.
+/// Sauvegarde au format du web : `{ version: 1, exportedAt, profiles, sessions, exercises }`,
+/// plus `cycle` s'il a été enregistré (clé inconnue du web, qui l'ignore).
 public enum Backup {
     struct File: Encodable {
         var version = 1
@@ -105,12 +108,14 @@ public enum Backup {
         var profiles: [String: Profile]
         var sessions: [String: Session]
         var exercises: [String: ExerciseOverride]
+        /// Absent du JSON quand il est nul.
+        var cycle: Cycle?
     }
 
     public static func export(profiles: [String: Profile], sessions: [String: Session],
-                              exercises: [String: ExerciseOverride], now: Date) -> Data {
+                              exercises: [String: ExerciseOverride], cycle: Cycle? = nil, now: Date) -> Data {
         let file = File(exportedAt: AppStore.timestamp(now), profiles: profiles,
-                        sessions: sessions, exercises: exercises)
+                        sessions: sessions, exercises: exercises, cycle: cycle)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         // Des dictionnaires de valeurs Codable simples : l'encodage ne peut pas échouer.
@@ -128,13 +133,25 @@ public enum Backup {
         }
         let (p, s, e) = (root.profiles, root.sessions, root.exercises)
         return BackupContent(profiles: p.byId(\.id), sessions: s.byId(\.id), exercises: e.byId(\.id),
-                             skipped: p.skipped + s.skipped + e.skipped)
+                             cycle: root.cycle, skipped: p.skipped + s.skipped + e.skipped)
     }
 
     private struct Root: Decodable {
         var profiles: LossyMap<Profile>
         var sessions: LossyMap<Session>
         var exercises: LossyMap<ExerciseOverride>
+        /// Illisible : ignoré, sans rejeter la sauvegarde.
+        var cycle: Cycle?
+
+        enum CodingKeys: String, CodingKey { case profiles, sessions, exercises, cycle }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            profiles = try c.decode(LossyMap<Profile>.self, forKey: .profiles)
+            sessions = try c.decode(LossyMap<Session>.self, forKey: .sessions)
+            exercises = try c.decode(LossyMap<ExerciseOverride>.self, forKey: .exercises)
+            cycle = (try? c.decodeIfPresent(Cycle.self, forKey: .cycle)) ?? nil
+        }
     }
 }
 

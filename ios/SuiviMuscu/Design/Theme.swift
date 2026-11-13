@@ -34,6 +34,10 @@ enum Theme {
     static let sheetBackground = Color(hex: 0xECF1EF)
     /// Fond blanc léger d'une liste ou d'un champ posé sur une carte ou une feuille.
     static let softFill = Color.white.opacity(0.6)
+    /// Icône d'alerte posée sur le bandeau foncé (carte du cycle) : orange clair lisible sur `ink`.
+    static let warningOnInk = Color(hex: 0xFFB38A)
+    /// Texte vert foncé sur un fond vert pâle (étiquette « Suivante » du choix de séance).
+    static let profile1Deep = Color(hex: 0x00594A)
     /// Bouton secondaire posé sur une barre flottante : presque blanc, pour se détacher.
     static let raisedFill = Color.white.opacity(0.9)
 
