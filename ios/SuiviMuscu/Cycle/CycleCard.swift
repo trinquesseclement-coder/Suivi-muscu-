@@ -5,9 +5,14 @@ import SuiviCore
 /// Même bandeau foncé que « Prochaine séance », en plus haut. L'accueil ne l'affiche que si
 /// `CyclePlanner.offersCycle` est vrai et que le cycle n'est pas vide.
 struct CycleCard: View {
+    /// L'heure de l'accueil (relue au retour au premier plan) : « aujourd'hui » vient d'elle.
+    let now: Date
     var zoom: Namespace.ID? = nil
     let onOpenSession: (SessionRoute) -> Void
     let onEditCycle: () -> Void
+    /// Au moment de l'appui, l'accueil n'était plus à jour (j'ai déjà une séance aujourd'hui) :
+    /// il relit l'heure et se redessine.
+    let onOutdated: () -> Void
 
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -16,8 +21,6 @@ struct CycleCard: View {
     @State private var showPicker = false
     /// « Modifier le cycle » touché dans la feuille : on l'ouvre une fois la feuille fermée.
     @State private var editAfterPicker = false
-    /// Évite de créer les séances deux fois sur un double appui.
-    @State private var starting = false
     @State private var visible = false
 
     var body: some View {
@@ -29,13 +32,13 @@ struct CycleCard: View {
             card(template: template, next: next, cycle: cycle)
                 .onChange(of: next.id) { _, _ in pickedId = nil }
                 .onChange(of: cycle) { _, _ in pickedId = nil }
+                .onChange(of: me.id) { _, _ in pickedId = nil }
         }
     }
 
     // MARK: Carte
 
     private func card(template: CycleTemplate, next: CycleTemplate, cycle: Cycle) -> some View {
-        let now = Date()
         let today = Dates.isoDate(now)
         let partner = store.partner
         let partnerFree = CyclePlanner.partnerIsFree(sessions: store.sessions, partnerId: partner.id,
@@ -110,7 +113,7 @@ struct CycleCard: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             AppIcon.warning.image
                 .font(Theme.icon(14, weight: .semibold))
-                .foregroundStyle(Color(hex: 0xFFB38A))
+                .foregroundStyle(Theme.warningOnInk)
                 .accessibilityHidden(true)
             Text("Cette séance n’a plus d’exercice. Modifie le cycle.")
                 .font(Theme.font(.subheadline, weight: .medium))
@@ -179,25 +182,35 @@ struct CycleCard: View {
 
     // MARK: Création
 
-    /// Crée la ou les séances du jour pour la séance type, puis ouvre la mienne.
+    /// Crée la ou les séances du jour pour la séance type, puis ouvre la mienne. Tout est revérifié
+    /// à l'heure de l'appui : si j'ai déjà une séance aujourd'hui (un double appui, ou l'accueil
+    /// resté d'hier), rien n'est créé et l'accueil se met à jour ; si l'autre n'est plus libre, seule
+    /// la mienne est créée. Avant, les séances du cycle jamais commencées des jours passés de
+    /// chacun sont retirées, pour ne pas s'entasser dans le Planning.
     private func start(_ template: CycleTemplate, target: PlanTarget) {
-        guard !starting else { return }
-        starting = true
-        let now = Date()
-        let created = CyclePlanner.sessions(for: template, target: target, me: store.me, partner: store.partner,
-                                            date: Dates.isoDate(now), sessions: store.sessions,
-                                            byId: store.exerciseById, now: now)
-        guard let mine = created.first(where: { $0.ownerId == store.meId }) else {
-            // Plus aucune machine : la carte le dit déjà, rien n'est créé.
-            starting = false
+        let now = AppClock.now()
+        let today = Dates.isoDate(now)
+        let sessions = store.sessions
+        let me = store.me
+        let partner = store.partner
+        guard CyclePlanner.offersCycle(sessions: sessions, ownerId: me.id, today: today, now: now) else {
+            onOutdated()
             return
         }
+        var target = target
+        if target == .both,
+           !CyclePlanner.partnerIsFree(sessions: sessions, partnerId: partner.id, today: today, now: now) {
+            target = .me
+        }
+        let created = CyclePlanner.sessions(for: template, target: target, me: me, partner: partner,
+                                            date: today, sessions: sessions, byId: store.exerciseById, now: now)
+        // Plus aucune machine : la carte le dit déjà, rien n'est créé.
+        guard let mine = created.first(where: { $0.ownerId == me.id }) else { return }
+        let stale = CyclePlanner.staleSessions(sessions, ownerIds: created.map(\.ownerId), today: today)
+        for s in stale { store.deleteSession(id: s.id) }
         for s in created { store.saveSession(s) }
         // Échec d'écriture : le bandeau rouge le signale, on reste sur l'accueil.
-        guard store.lastSaveError == nil else {
-            starting = false
-            return
-        }
+        guard store.lastSaveError == nil else { return }
         onOpenSession(SessionRoute(id: mine.id, source: "cycle"))
     }
 
@@ -208,7 +221,10 @@ struct CycleCard: View {
         template.items.filter { byId[$0.exerciseId] != nil }.count
     }
 
-    static func exercises(_ n: Int) -> String { n > 1 ? "\(n) exercices" : "\(n) exercice" }
+    /// « 7 exercices », « 1 exercice », « Aucun exercice disponible » (machines toutes masquées).
+    static func exercises(_ n: Int) -> String {
+        n == 0 ? "Aucun exercice disponible" : n > 1 ? "\(n) exercices" : "\(n) exercice"
+    }
 
     /// « 7 exercices · après Épaules + dos ».
     static func detail(count: Int, after last: String?) -> String {

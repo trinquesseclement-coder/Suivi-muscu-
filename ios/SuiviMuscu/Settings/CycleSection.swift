@@ -81,7 +81,7 @@ struct CycleSection: View {
                             .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(Self.countText(count))
+                        Text(CycleCard.exercises(count))
                             .font(Theme.font(.footnote))
                             .foregroundStyle(count == 0 ? Theme.destructive : Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -100,7 +100,7 @@ struct CycleSection: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(rank). \(t.title), \(Self.countText(count))")
+            .accessibilityLabel("\(rank). \(t.title), \(CycleCard.exercises(count))")
             .accessibilityHint("Modifier cette séance")
             .accessibilityAddTraits(.isButton)
             optionsMenu(t, isFirst: isFirst, isLast: isLast)
@@ -209,10 +209,5 @@ struct CycleSection: View {
     /// (lignes du cycle, bulles de confirmation). La coupure reste possible après lui.
     static func keepTogether(_ text: String) -> String {
         text.replacingOccurrences(of: " + ", with: "\u{00A0}+ ")
-    }
-
-    /// Exercices disponibles (machines visibles), comme la carte de l'accueil.
-    static func countText(_ count: Int) -> String {
-        count == 0 ? "Aucun exercice disponible" : CycleCard.exercises(count)
     }
 }

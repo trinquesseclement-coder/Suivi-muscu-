@@ -115,7 +115,7 @@ struct CycleTemplateEditor: View {
             }
             .buttonStyle(PressableStyle())
             .accessibilityLabel("Retour sans enregistrer")
-            Text(isNew ? "Nouvelle séance" : "Modifier la séance")
+            Text(isNew ? "Nouvelle séance du cycle" : "Séance du cycle")
                 .font(Theme.font(.title, weight: .bold))
                 .foregroundStyle(Theme.onBackground)
                 .lineLimit(2)

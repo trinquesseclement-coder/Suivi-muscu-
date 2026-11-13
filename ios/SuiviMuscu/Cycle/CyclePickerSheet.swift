@@ -105,7 +105,7 @@ struct CyclePickerSheet: View {
     private var nextTag: some View {
         Text("Suivante")
             .font(Theme.font(.caption, weight: .semibold))
-            .foregroundStyle(Color(hex: 0x00594A))
+            .foregroundStyle(Theme.profile1Deep)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(Capsule().fill(Theme.profile1.opacity(0.16)))
