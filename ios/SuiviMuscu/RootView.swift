@@ -28,7 +28,9 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab: AppTab = .home
     @State private var bounce = 0
-    @State private var path: [SessionRoute] = []
+    @State private var path = NavigationPath()
+    /// Une date de la semaine affichée par le Planning (aujourd'hui au départ).
+    @State private var planningWeek = Dates.isoDate(Date())
     @Namespace private var zoom
 
     @State private var showSettings = false
@@ -43,11 +45,12 @@ struct RootView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showSettings) { SettingsView() }
             .navigationDestination(for: SessionRoute.self) { route in
-                SessionView(sessionId: route.id, fresh: route.fresh) { id in
-                    path = [SessionRoute(id: id, source: route.source)]
-                }
+                SessionView(sessionId: route.id, fresh: route.fresh,
+                            onReplace: { id in path = NavigationPath([SessionRoute(id: id, source: route.source)]) },
+                            onEditPlan: { id in path.append(PlanRoute(sessionId: id)) })
                 .navigationTransition(.zoom(sourceID: route.source, in: zoom))
             }
+            .navigationDestination(for: PlanRoute.self, destination: planDestination)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -76,8 +79,28 @@ struct RootView: View {
         case .home:
             HomeView(zoom: zoom, onOpenSession: open, onFreeSession: { startFreeSession(source: "free") },
                      onAvatar: { showSettings = true })
-        case .planning, .load, .machines:
-            ComingSoon(tab: tab)
+        case .planning:
+            PlanningView(week: $planningWeek, zoom: zoom,
+                         onOpenSession: { id in open(SessionRoute(id: id, source: "planning-\(id)")) },
+                         onPlan: { date in path.append(PlanRoute(date: date)) })
+        case .load:
+            LoadView()
+        case .machines:
+            MachinesView()
+        }
+    }
+
+    /// Une séance qui n'est plus modifiable (commencée entre-temps) s'ouvre normalement.
+    @ViewBuilder private func planDestination(_ route: PlanRoute) -> some View {
+        if let id = route.sessionId, let s = store.session(id), !Rules.isEditablePlan(s, meId: store.meId) {
+            SessionView(sessionId: id)
+        } else {
+            PlanEditorView(sessionId: route.sessionId, date: route.date) { date in
+                // Retour au Planning, sur la semaine de la date choisie, d'où qu'on vienne.
+                planningWeek = date
+                tab = .planning
+                path = NavigationPath()
+            }
         }
     }
 
@@ -97,17 +120,30 @@ struct RootView: View {
     }
 
     /// Mise au point : `-open-next` ouvre la séance en cours ou la prochaine prévue,
-    /// `-open-session <id>` ouvre une séance précise.
+    /// `-open-session <id>` ouvre une séance précise, `-open-plan <AAAA-MM-JJ>` et
+    /// `-open-plan-session <id>` l'éditeur de séance planifiée, `-import-file <chemin>` ouvre les Réglages et lance l'import de ce fichier, `-open-tab planning` (ou `load`, `machines`) choisit l'onglet
+    /// et `-planning-week <AAAA-MM-JJ>` la semaine du Planning.
     private func openFromLaunchArguments() {
         #if DEBUG
         guard path.isEmpty else { return }
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("-open-settings") { showSettings = true; return }
+        if let i = args.firstIndex(of: "-open-tab"), i + 1 < args.count,
+           let t = AppTab.allCases.first(where: { "\($0)" == args[i + 1] }) {
+            tab = t
+        }
+        if let i = args.firstIndex(of: "-planning-week"), i + 1 < args.count {
+            planningWeek = args[i + 1]
+        }
+        if args.contains("-open-settings") || args.contains("-import-file") { showSettings = true; return }
         if let i = args.firstIndex(of: "-open-session"), i + 1 < args.count {
-            path = [SessionRoute(id: args[i + 1], source: "launch")]
+            path = NavigationPath([SessionRoute(id: args[i + 1], source: "launch")])
         } else if args.contains("-open-next"),
                   let s = HomeView.nextSession(store.sessions, meId: store.meId, now: Date()) {
-            path = [SessionRoute(id: s.id, source: "next")]
+            path = NavigationPath([SessionRoute(id: s.id, source: "next")])
+        } else if let i = args.firstIndex(of: "-open-plan"), i + 1 < args.count {
+            path.append(PlanRoute(date: args[i + 1]))
+        } else if let i = args.firstIndex(of: "-open-plan-session"), i + 1 < args.count {
+            path.append(PlanRoute(sessionId: args[i + 1]))
         }
         #endif
     }
@@ -171,43 +207,5 @@ struct RootView: View {
         .buttonStyle(PressableStyle())
         .zoomSource("add", in: zoom)
         .accessibilityLabel("Séance libre")
-    }
-}
-
-/// Onglet pas encore construit : dit ce qui arrive, plutôt qu'un écran muet.
-private struct ComingSoon: View {
-    let tab: AppTab
-
-    private var text: String {
-        switch tab {
-        case .planning: "Le planning de la semaine arrive : tu pourras préparer une séance pour toi, pour l’autre ou pour vous deux."
-        case .load: "Le tableau de charge arrive : tes séances, tes heures et ta progression machine par machine."
-        case .machines: "Le catalogue des machines arrive : photos, réglages du siège et corrections."
-        case .home: ""
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 12) {
-            tab.icon.image
-                .font(Theme.icon(22, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 56, height: 56)
-                .background(Circle().fill(Color.white.opacity(0.7)))
-            Text(tab.label).font(Theme.font(.title3, weight: .bold))
-            Text(text)
-                .font(Theme.font(.subheadline))
-                .foregroundStyle(Theme.ink2)
-                .multilineTextAlignment(.center)
-            Text("Bientôt")
-                .font(Theme.font(.caption, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(Capsule().fill(Theme.ink.opacity(0.08)))
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .glassCard()
-        .padding(.horizontal, 16)
-        .accessibilityElement(children: .combine)
     }
 }

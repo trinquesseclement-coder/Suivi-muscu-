@@ -150,4 +150,9 @@ public enum Stats {
         if h == 0 { return "\(m) min" }
         return m == 0 ? "\(h)h" : "\(h)h" + (m < 10 ? "0\(m)" : "\(m)")
     }
+
+    /// Comme `formatHours`, en plus court pour un libellé au-dessus d'une barre : 45 → "45m".
+    public static func formatHoursCompact(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes)m" : formatHours(minutes)
+    }
 }

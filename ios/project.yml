@@ -15,12 +15,14 @@ targets:
       - SuiviMuscu
     dependencies:
       - package: SuiviCore
-    # Heure et batterie en blanc sur le fond sombre de l'appli (les autres clés sont générées par Xcode).
+    # Heure et batterie en blanc sur le fond sombre de l'appli ; texte de la demande d'accès à l'appareil photo
+    # (photos des machines). Les autres clés sont générées par Xcode.
     info:
       path: SuiviMuscu/Info.plist
       properties:
         UIViewControllerBasedStatusBarAppearance: false
         UIStatusBarStyle: UIStatusBarStyleLightContent
+        NSCameraUsageDescription: "Pour photographier les machines de la salle et les reconnaître du premier coup d'œil."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.suivimuscu.app

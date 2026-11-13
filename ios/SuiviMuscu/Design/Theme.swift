@@ -26,6 +26,16 @@ enum Theme {
     static let profile2 = Color(hex: 0xD65A1F)
     static let orange = profile2
     static let success = Color(hex: 0x0CA30C)
+    /// Texte des actions qui suppriment (« Supprimer ») : rouge lisible sur fond clair.
+    static let destructive = Color(hex: 0xB3261E)
+    /// Fond des encarts sur l'aide (regrouper les exercices avec aide) : orange très pâle.
+    static let helpTint = Color(hex: 0xF6E6DC)
+    /// Fond des feuilles (sélecteur d'exercices, « Reprendre une séance »).
+    static let sheetBackground = Color(hex: 0xECF1EF)
+    /// Fond blanc léger d'une liste ou d'un champ posé sur une carte ou une feuille.
+    static let softFill = Color.white.opacity(0.6)
+    /// Bouton secondaire posé sur une barre flottante : presque blanc, pour se détacher.
+    static let raisedFill = Color.white.opacity(0.9)
 
     static let cardRadius: CGFloat = 26
     static let smallRadius: CGFloat = 18

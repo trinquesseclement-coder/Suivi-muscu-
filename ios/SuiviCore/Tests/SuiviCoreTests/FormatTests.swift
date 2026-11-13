@@ -26,6 +26,15 @@ import Testing
         #expect(Format.day("2026-11-15", today: "2026-11-12") == "Dimanche 15 novembre")
     }
 
+    /// Le mot du jour seul, à côté du sélecteur de date de l'éditeur.
+    @Test func dayWord() {
+        #expect(Format.dayWord("2026-11-12", today: "2026-11-12") == "Aujourd’hui")
+        #expect(Format.dayWord("2026-11-13", today: "2026-11-12") == "Demain")
+        #expect(Format.dayWord("2026-11-11", today: "2026-11-12") == "Hier")
+        #expect(Format.dayWord("2026-11-14", today: "2026-11-12") == "Samedi")
+        #expect(Format.dayWord("pas-une-date", today: "2026-11-12") == "")
+    }
+
     @Test func tonnage() {
         #expect(Format.tonnage(5400) == "5,4 t")
         #expect(Format.tonnage(5000) == "5 t")
@@ -58,5 +67,14 @@ import Testing
         #expect(Format.load(27.5) == "27,5")
         #expect(Format.load(40) == "40")
         #expect(Format.load(0.1 + 0.2) == "0,3")
+    }
+
+    /// Colonne des jours du planning : « Lun » au-dessus de « 9 ».
+    @Test func weekdayShortAndDayOfMonth() {
+        #expect(Format.weekdayShort("2026-11-09") == "Lun")
+        #expect(Format.weekdayShort("2026-11-12") == "Jeu")
+        #expect(Format.weekdayShort("2026-11-15") == "Dim")
+        #expect(Format.dayOfMonth("2026-11-09") == "9")
+        #expect(Format.dayOfMonth("2026-11-15") == "15")
     }
 }

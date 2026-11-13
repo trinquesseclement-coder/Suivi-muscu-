@@ -218,4 +218,236 @@ struct StoreTests {
         #expect(store.session("s1") == nil)
         #expect(store.session("absent") == nil)
     }
+
+    // MARK: Corrections de machines tolérantes
+
+    func writeRaw(_ json: String, to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(json.utf8).write(to: url)
+    }
+
+    func storeJSON(sessions: String = "{}", exercises: String = "{}") -> String {
+        """
+        {"meId": "local-clement",
+         "profiles": {"local-clement": {"id": "local-clement", "name": "Clément", "slot": 1},
+                      "local-jules": {"id": "local-jules", "name": "Jules", "slot": 2}},
+         "sessions": \(sessions), "exercises": \(exercises)}
+        """
+    }
+
+    func encoded(_ session: Session) throws -> String {
+        String(data: try JSONEncoder().encode(session), encoding: .utf8)!
+    }
+
+    @Test func partialOverrideMergesOntoCatalogue() throws {
+        let url = tempFile()
+        try writeRaw(storeJSON(exercises: #"{"m-chest-press": {"id": "m-chest-press", "note": "Siège cran 4"}}"#), to: url)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == nil)
+        #expect(try backups(of: url).isEmpty)
+        let ex = try #require(store.exerciseById["m-chest-press"])
+        #expect(ex.note == "Siège cran 4")
+        #expect(ex.name == "Chest press")
+        #expect(ex.posture == .transfert)
+        #expect(ex.step == 5)
+        // Une écriture ne perd pas la correction.
+        store.saveSession(makeSession())
+        #expect(AppStore(fileURL: url).exerciseById["m-chest-press"]?.note == "Siège cran 4")
+    }
+
+    @Test func unreadableOverrideDoesNotCorruptTheFile() throws {
+        let url = tempFile()
+        try writeRaw(storeJSON(sessions: #"{"s1": \#(try encoded(makeSession()))}"#,
+                               exercises: #"{"bad": 12, "m-curl": {"id": "m-curl", "note": "Cran 3"}}"#), to: url)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == nil)
+        #expect(try backups(of: url).isEmpty)
+        #expect(store.sessions.count == 1)
+        #expect(store.exerciseById["m-curl"]?.note == "Cran 3")
+        #expect(store.exercises.count == Catalogue.base.count)
+    }
+
+    @Test func unreadableSessionInStoreFileStillGoesToCorrupt() throws {
+        let url = tempFile()
+        let raw = storeJSON(sessions: #"{"s1": \#(try encoded(makeSession())), "s2": {"id": "s2", "title": 3}}"#)
+        try writeRaw(raw, to: url)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem == "Données illisibles : une copie a été gardée sur le téléphone.")
+        #expect(store.sessions.isEmpty)
+        let found = try backups(of: url)
+        #expect(found.count == 1)
+        #expect(try Data(contentsOf: found[0]) == Data(raw.utf8))
+    }
+
+    @Test func hiddenExerciseStillResolvesInHistory() {
+        let url = tempFile()
+        let store = AppStore(fileURL: url)
+        var ex = store.exerciseById["m-chest-press"]!
+        ex.deleted = true
+        store.saveExercise(ex)
+        #expect(store.exerciseById["m-chest-press"] == nil)
+        #expect(!store.exercises.contains { $0.id == "m-chest-press" })
+        #expect(store.exerciseAnyById["m-chest-press"]?.name == "Chest press")
+        #expect(AppStore(fileURL: url).exerciseAnyById["m-chest-press"]?.deleted == true)
+    }
+
+    // MARK: Sauvegarde et import
+
+    func backupData(sessions: [Session] = [], extraSessions: [String: String] = [:],
+                    exercises: String = "{}", profiles: String = "{}") throws -> Data {
+        var entries = try sessions.map { "\"\($0.id)\": \(try encoded($0))" }
+        entries += extraSessions.map { "\"\($0.key)\": \($0.value)" }
+        let json = """
+        {"version": 1, "exportedAt": "2026-11-12T12:00:00.000Z", "profiles": \(profiles),
+         "sessions": {\(entries.joined(separator: ","))}, "exercises": \(exercises)}
+        """
+        return Data(json.utf8)
+    }
+
+    func withUpdatedAt(_ s: Session, _ updatedAt: String, title: String? = nil) -> Session {
+        var s = s
+        s.updatedAt = updatedAt
+        if let title { s.title = title }
+        return s
+    }
+
+    @Test func importKeepsNewerLocalSession() throws {
+        let store = AppStore(fileURL: tempFile())
+        store.saveSession(withUpdatedAt(makeSession(), "x", title: "Locale"))  // updatedAt = maintenant
+        let older = withUpdatedAt(makeSession(), "2020-01-01T00:00:00.000Z", title: "Ancienne")
+        let summary = try store.importData(try backupData(sessions: [older]))
+        #expect(summary == ImportSummary(added: 0, updated: 0, kept: 1, skipped: 0))
+        #expect(store.session("s1")?.title == "Locale")
+    }
+
+    @Test func importAddsAndUpdates() throws {
+        let url = tempFile()
+        let store = AppStore(fileURL: url)
+        store.saveSession(withUpdatedAt(makeSession(), "x", title: "Locale"))
+        let newer = withUpdatedAt(makeSession(), "2099-01-01T00:00:00.000Z", title: "Importée")
+        let fresh = withUpdatedAt(makeSession(id: "s2"), "2026-11-01T00:00:00.000Z", title: "Nouvelle")
+        let summary = try store.importData(try backupData(sessions: [newer, fresh]))
+        #expect(summary == ImportSummary(added: 1, updated: 1, kept: 0, skipped: 0))
+        #expect(store.session("s1")?.title == "Importée")
+        #expect(store.session("s1")?.updatedAt == "2099-01-01T00:00:00.000Z")
+        #expect(store.session("s2")?.title == "Nouvelle")
+        // Une seule écriture, à la fin : un nouveau chargement voit tout.
+        let again = AppStore(fileURL: url)
+        #expect(again.session("s1")?.title == "Importée")
+        #expect(again.session("s2")?.title == "Nouvelle")
+    }
+
+    @Test func importIgnoresIdenticalSession() throws {
+        let store = AppStore(fileURL: tempFile())
+        store.saveSession(makeSession())
+        let same = try #require(store.session("s1"))
+        let summary = try store.importData(try backupData(sessions: [same]))
+        #expect(summary == ImportSummary(added: 0, updated: 0, kept: 0, skipped: 0))
+    }
+
+    @Test func importSkipsUnreadableSession() throws {
+        let store = AppStore(fileURL: tempFile())
+        let data = try backupData(sessions: [makeSession(id: "a"), makeSession(id: "b")],
+                                  extraSessions: ["c": #"{"id": "c", "date": 20261112}"#])
+        let summary = try store.importData(data)
+        #expect(summary == ImportSummary(added: 2, updated: 0, kept: 0, skipped: 1))
+        #expect(store.sessions.map(\.id).sorted() == ["a", "b"])
+    }
+
+    @Test func importedDeletionFollowsNewestWins() throws {
+        let store = AppStore(fileURL: tempFile())
+        store.saveSession(withUpdatedAt(makeSession(id: "live"), "x"))
+        var oldDeletion = withUpdatedAt(makeSession(id: "live"), "2020-01-01T00:00:00.000Z")
+        oldDeletion.deleted = true
+        #expect(try store.importData(try backupData(sessions: [oldDeletion])).kept == 1)
+        #expect(store.session("live") != nil)
+
+        var newDeletion = withUpdatedAt(makeSession(id: "live"), "2099-01-01T00:00:00.000Z")
+        newDeletion.deleted = true
+        #expect(try store.importData(try backupData(sessions: [newDeletion])).updated == 1)
+        #expect(store.session("live") == nil)
+
+        // Une suppression plus ancienne ne ressuscite rien.
+        let oldLive = withUpdatedAt(makeSession(id: "live"), "2050-01-01T00:00:00.000Z")
+        #expect(try store.importData(try backupData(sessions: [oldLive])).kept == 1)
+        #expect(store.session("live") == nil)
+    }
+
+    @Test func importMergesOverridesAndOnlyFillsMissingProfileFields() throws {
+        let store = AppStore(fileURL: tempFile())
+        var clement = store.me
+        clement.avatar = "data:image/jpeg;base64,LOCAL"
+        store.saveProfile(clement)
+        var chest = store.exerciseById["m-chest-press"]!
+        chest.photo = "data:image/jpeg;base64,PHOTO"
+        store.saveExercise(chest)
+        let profiles = """
+        {"local-clement": {"id": "local-clement", "name": "Autre nom", "slot": 2,
+                           "avatar": "data:image/jpeg;base64,IMPORT", "settings": {"weeklyGoal": 4}},
+         "local-jules": {"id": "local-jules", "name": "Jules", "slot": 2,
+                         "avatar": "data:image/jpeg;base64,JULES"},
+         "inconnu": {"id": "inconnu", "name": "Inconnu", "slot": 3}}
+        """
+        let exercises = #"{"m-chest-press": {"id": "m-chest-press", "note": "Siège cran 4"}}"#
+        _ = try store.importData(try backupData(exercises: exercises, profiles: profiles))
+        #expect(store.me.name == "Clément")
+        #expect(store.me.slot == 1)
+        #expect(store.me.avatar == "data:image/jpeg;base64,LOCAL")
+        #expect(store.me.settings?.weeklyGoal == 4)
+        #expect(store.partner.avatar == "data:image/jpeg;base64,JULES")
+        #expect(store.profiles.count == 2)
+        let merged = try #require(store.exerciseById["m-chest-press"])
+        #expect(merged.note == "Siège cran 4")
+        #expect(merged.photo == "data:image/jpeg;base64,PHOTO")
+    }
+
+    @Test func importRejectsNonBackupAndChangesNothing() throws {
+        let url = tempFile()
+        let store = AppStore(fileURL: url)
+        store.saveSession(makeSession())
+        let before = try Data(contentsOf: url)
+        #expect(throws: BackupError.self) { try store.importData(Data("pas une sauvegarde".utf8)) }
+        #expect(throws: BackupError.self) { try store.importData(Data(#"{"version": 1}"#.utf8)) }
+        #expect(try Data(contentsOf: url) == before)
+        #expect(store.sessions.count == 1)
+    }
+
+    @Test func importWhileWriteBlockedThrowsAndChangesNothing() throws {
+        // Un dossier à la place du fichier : lecture impossible, écritures bloquées.
+        let url = tempFile()
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        let store = AppStore(fileURL: url)
+        #expect(store.loadProblem != nil)
+        #expect(throws: BackupError.self) { try store.importData(try backupData(sessions: [makeSession()])) }
+        #expect(store.sessions.isEmpty)
+        var isDir: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue)
+    }
+
+    @Test func exportDataRoundTripsWithFullOverrides() throws {
+        let url = tempFile()
+        try writeRaw(storeJSON(sessions: #"{"s1": \#(try encoded(makeSession()))}"#,
+                               exercises: #"{"m-chest-press": {"id": "m-chest-press", "note": "Siège cran 4"}}"#), to: url)
+        let store = AppStore(fileURL: url)
+        store.deleteSession(id: "s1")
+        let data = store.exportData()
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["version"] as? Int == 1)
+        let chest = (json["exercises"] as? [String: Any])?["m-chest-press"] as? [String: Any]
+        #expect(chest?["name"] as? String == "Chest press")
+        #expect(chest?["posture"] as? String == "transfert")
+        #expect(chest?["note"] as? String == "Siège cran 4")
+        #expect(json["meId"] == nil)
+        let content = try Backup.decode(data)
+        #expect(content.sessions["s1"]?.deleted == true)  // la suppression voyage aussi
+        #expect(content.profiles.count == 2)
+
+        let other = AppStore(fileURL: tempFile())
+        // Une séance supprimée inconnue ici est gardée comme suppression, sans compter comme ajout.
+        let summary = try other.importData(data)
+        #expect(summary == ImportSummary(added: 0, updated: 0, kept: 0, skipped: 0))
+        #expect(other.sessions.isEmpty)
+        #expect(try Backup.decode(other.exportData()).sessions["s1"]?.deleted == true)
+        #expect(other.exerciseById["m-chest-press"]?.note == "Siège cran 4")
+    }
 }

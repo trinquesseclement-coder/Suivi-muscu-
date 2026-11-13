@@ -9,6 +9,12 @@ struct SessionRoute: Hashable {
     var fresh = false
 }
 
+/// L'éditeur de séance planifiée : une séance existante (`sessionId`) ou une nouvelle, à `date`.
+struct PlanRoute: Hashable {
+    var sessionId: String?
+    var date: String?
+}
+
 extension View {
     /// Marque la vue comme point de départ du zoom vers une séance.
     @ViewBuilder func zoomSource(_ id: String, in namespace: Namespace.ID?) -> some View {

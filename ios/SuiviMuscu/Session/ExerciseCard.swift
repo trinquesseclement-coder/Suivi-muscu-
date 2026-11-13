@@ -19,6 +19,8 @@ struct ExerciseCard: View {
     /// Une série vient d'être validée (le minuteur de repos s'y branchera, tâche 9).
     let onSetValidated: () -> Void
 
+    @State private var showingMachine = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             head
@@ -77,7 +79,13 @@ struct ExerciseCard: View {
 
     private var head: some View {
         HStack(alignment: .top, spacing: 12) {
-            ExerciseThumb(exercise: exercise)
+            // Ouvre la fiche (photo, mouvement) : on peut photographier la machine en pleine séance.
+            Button { showingMachine = true } label: { ExerciseThumb(exercise: exercise) }
+                .buttonStyle(PressableStyle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Voir \(exercise.name) : machine et mouvement")
+                .accessibilityAddTraits(.isButton)
+                .sheet(isPresented: $showingMachine) { MachineSheet(exercise: exercise) }
             VStack(alignment: .leading, spacing: 6) {
                 Text(exercise.name)
                     .font(Theme.font(.headline, weight: .semibold))
@@ -348,8 +356,8 @@ struct ExerciseThumb: View {
 
     var body: some View {
         Group {
-            if let photo = AvatarDecoder.image(from: exercise.photo) {
-                Image(uiImage: photo).resizable().scaledToFill()
+            if let photo = exercise.photo, !photo.isEmpty {
+                DataURLImageView(owner: exercise.id, dataURL: photo, points: size) { placeholder }
             } else if let url = Illustrations.urls(for: exercise.id)?.start {
                 RemoteImage(url: url) { placeholder }
             } else {

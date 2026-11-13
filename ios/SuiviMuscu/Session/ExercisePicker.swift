@@ -4,36 +4,36 @@ import SuiviCore
 /// Choix des exercices à ajouter à la séance (reprend `ExercisePicker` et `ExerciseFilters` du web).
 /// La sélection est multiple ; « Ajouter (n) » renvoie les exercices dans l'ordre où on les a choisis.
 struct ExercisePicker: View {
+    /// La personne pour qui on choisit (`nil` = moi) : le filtre et l'étiquette « Aide » ne
+    /// s'affichent que si elle a besoin d'aide.
+    var owner: Profile? = nil
     let onAdd: ([Exercise]) -> Void
 
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    /// Posture retenue d'une ouverture à l'autre : « fauteuil », « transfert », « debout » ou vide (tout).
-    @AppStorage("picker.posture") private var postureRaw = ""
-    @State private var query = ""
-    @State private var help: HelpFilter = .all
-    @State private var muscle: Muscle?
+    /// Seule la posture est retenue d'une ouverture à l'autre (`picker.posture`, clé du plan 1) : aide,
+    /// muscle et recherche repartent de « tout » à chaque ouverture (un muscle ou « Sans aide » oublié
+    /// cacherait des exercices).
+    @State private var filters = Self.storedFilters()
     @State private var picked: [String] = []
     @FocusState private var searching: Bool
 
-    enum HelpFilter { case all, with, without }
+    private static let postureKey = "picker.posture"
+    /// Ancienne clé (aide et muscle retenus) : effacée à la lecture.
+    private static let staleFiltersKey = "picker.filters"
 
-    private var posture: Posture? { Posture(rawValue: postureRaw) }
-
-    private var list: [Exercise] {
-        let q = Self.norm(query.trimmingCharacters(in: .whitespacesAndNewlines))
-        return store.exercises.filter { e in
-            if !q.isEmpty && !Self.norm(e.name).contains(q) && !Self.norm(Catalogue.muscleLabel(e.muscle)).contains(q) {
-                return false
-            }
-            if let posture, e.posture != posture { return false }
-            if help == .with && !e.help { return false }
-            if help == .without && e.help { return false }
-            if let muscle, e.muscle != muscle { return false }
-            return true
-        }
+    private static func storedFilters() -> FilterState {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: staleFiltersKey)
+        var state = FilterState()
+        state.posture = defaults.string(forKey: postureKey).flatMap(Posture.init(rawValue:))
+        return state
     }
+
+    private var helpMatters: Bool { Rules.profileNeedsHelp(owner ?? store.me) }
+
+    private var list: [Exercise] { filters.apply(store.exercises, helpMatters: helpMatters) }
 
     var body: some View {
         let shown = list
@@ -42,7 +42,9 @@ struct ExercisePicker: View {
             header
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    filters
+                    ExerciseFilters(state: $filters,
+                                    helperName: helpMatters ? Rules.helperName(store.profiles) ?? "aide" : nil,
+                                    searching: $searching)
                         .padding(.bottom, 10)
                     if shown.isEmpty {
                         Text("Aucun exercice avec ces filtres.")
@@ -70,13 +72,16 @@ struct ExercisePicker: View {
             // Le clavier ouvert laisse peu de place : le bouton revient quand la recherche est fermée.
             if !searching { footer(byId) }
         }
-        .background(Color(hex: 0xECF1EF).ignoresSafeArea())
+        .background(Theme.sheetBackground.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onChange(of: filters.posture) { _, new in
+            UserDefaults.standard.set(new?.rawValue ?? "", forKey: Self.postureKey)
+        }
     }
 
-    // MARK: En-tête et filtres
+    // MARK: En-tête
 
     private var header: some View {
         HStack {
@@ -96,88 +101,6 @@ struct ExercisePicker: View {
         .padding(.leading, 16)
         .padding(.trailing, 6)
         .padding(.top, 14)
-    }
-
-    private var filters: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                AppIcon.search.image.foregroundStyle(Theme.ink2)
-                TextField("Chercher une machine…", text: $query)
-                    .font(Theme.font(.body))
-                    .submitLabel(.search)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .focused($searching)
-                    .accessibilityLabel("Chercher")
-                if !query.isEmpty {
-                    Button { query = "" } label: {
-                        AppIcon.close.image.font(Theme.icon(14, weight: .bold))
-                            .frame(width: Theme.minTouch, height: Theme.minTouch)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Effacer la recherche")
-                }
-            }
-            .padding(.leading, 16)
-            .padding(.trailing, query.isEmpty ? 16 : 0)
-            .frame(minHeight: Theme.minTouch)
-            .background(Capsule().fill(Color.white.opacity(0.85)))
-            .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.1), lineWidth: 1))
-            .padding(.bottom, 4)
-
-            // Posture et aide sur une seule rangée qui défile : la liste commence plus haut.
-            chips {
-                postureChip("Depuis le fauteuil", .fauteuil, icon: .wheelchair)
-                postureChip("Transfert", .transfert, icon: nil)
-                postureChip("Debout", .debout, icon: nil)
-                Capsule().fill(Theme.ink.opacity(0.12)).frame(width: 1.5, height: 22)
-                    .accessibilityHidden(true)
-                chip("Avec aide", on: help == .with, icon: .help) { help = help == .with ? .all : .with }
-                chip("Sans aide", on: help == .without, icon: nil) { help = help == .without ? .all : .without }
-            }
-            chips {
-                chip("Tout", on: muscle == nil, icon: nil) { muscle = nil }
-                ForEach(Muscle.allCases, id: \.self) { m in
-                    chip(Catalogue.muscleLabel(m), on: muscle == m, icon: nil) { muscle = m }
-                }
-            }
-        }
-        .padding(.top, 8)
-    }
-
-    private func chips<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) { content() }
-                .padding(.horizontal, 16)
-        }
-        .scrollIndicators(.hidden)
-        .padding(.horizontal, -16)
-    }
-
-    private func postureChip(_ title: String, _ value: Posture, icon: AppIcon?) -> some View {
-        chip(title, on: posture == value, icon: icon) { postureRaw = posture == value ? "" : value.rawValue }
-    }
-
-    private func chip(_ title: String, on: Bool, icon: AppIcon?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon { icon.image.font(Theme.icon(13, weight: .semibold)) }
-                Text(title)
-            }
-            .font(Theme.font(.subheadline, weight: .medium))
-            .foregroundStyle(on ? Color.white : Theme.ink)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 38)
-            .background(Capsule().fill(on ? Theme.ink : Color.white.opacity(0.85)))
-            .overlay(Capsule().strokeBorder(Theme.ink.opacity(on ? 0 : 0.1), lineWidth: 1))
-            // La puce fait 38 pt de haut, sa zone tactile 48.
-            .frame(minHeight: Theme.minTouch)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableStyle())
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .motion(Motion.spring, value: on)
     }
 
     // MARK: Lignes
@@ -210,7 +133,7 @@ struct ExercisePicker: View {
                             .font(Theme.font(.footnote))
                             .foregroundStyle(Theme.ink2)
                             .lineLimit(1)
-                        if ex.help {
+                        if ex.help && helpMatters {
                             HStack(spacing: 3) {
                                 AppIcon.help.image.font(Theme.icon(11, weight: .semibold))
                                 Text("Aide")
@@ -233,7 +156,7 @@ struct ExercisePicker: View {
         .buttonStyle(.plain)
         .motion(Motion.spring, value: on)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(ex.name), \(Catalogue.muscleLabel(ex.muscle)), \(Self.postureText(ex.posture))\(ex.help ? ", avec aide" : "")")
+        .accessibilityLabel("\(ex.name), \(Catalogue.muscleLabel(ex.muscle)), \(Self.postureText(ex.posture))\(ex.help && helpMatters ? ", avec aide" : "")")
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -258,14 +181,10 @@ struct ExercisePicker: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 8)
-        .background(Color(hex: 0xECF1EF).shadow(.drop(color: .black.opacity(0.08), radius: 6, y: -2)))
+        .background(Theme.sheetBackground.shadow(.drop(color: .black.opacity(0.08), radius: 6, y: -2)))
     }
 
     // MARK: Textes
-
-    private static func norm(_ s: String) -> String {
-        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
-    }
 
     private static func postureLabel(_ p: Posture) -> String {
         switch p {
